@@ -149,6 +149,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
       <button class="nav-tab active" onclick="showPage('schedule')">Schedule</button>
       <button class="nav-tab" onclick="showPage('book')">Book equipment</button>
       <button class="nav-tab" onclick="tryAdmin()">Admin <span class="nav-badge" id="pending-count" style="display:none">0</span></button>
+      <button class="nav-tab" onclick="showPage('usage')">Lab usage</button>
     </div>
   </div>
 </nav>
@@ -219,6 +220,17 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   <div class="request-list" id="request-list"><div class="empty-state">Loading…</div></div>
 </div>
 
+<div class="page" id="page-usage">
+  <div class="admin-header">
+    <div class="page-header" style="margin:0"><h1>Lab usage</h1><p>Live sign-in/out tracking across all machines.</p></div>
+    <button onclick="exportSessionsCSV()" style="font-size:12px;font-weight:500;padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;">Download CSV</button>
+  </div>
+  <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Currently active</h3>
+  <div class="request-list" id="active-sessions" style="margin-bottom:28px"><div class="empty-state">No one currently signed in.</div></div>
+  <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Recent sessions</h3>
+  <div class="request-list" id="past-sessions"><div class="empty-state">No sessions yet.</div></div>
+</div>
+
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <h3 id="modal-title">Book this slot</h3>
@@ -256,10 +268,68 @@ const EQUIPMENT = [
 ];
 // Initialize variables
 let db = null, allBookings = [], selectedEquip = null, weekOffset = 0, adminFilter = 'all', adminUnlocked = false, modalSlot = null;
+let allSessions = [];
 
 // Connect directly to Supabase
 db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 initSupabase();
+
+await fetchSessions();
+db.channel('sessions-live')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, fetchSessions)
+  .subscribe();
+
+  async function fetchSessions() {
+  const { data } = await db.from('sessions').select('*').order('signed_in_at', { ascending: false }).limit(100);
+  if (data) { allSessions = data; if (document.getElementById('page-usage').classList.contains('active')) renderUsage(); }
+}
+
+function renderUsage() {
+  const active = allSessions.filter(s => !s.signed_out_at);
+  const past = allSessions.filter(s => s.signed_out_at).slice(0, 30);
+  const activeEl = document.getElementById('active-sessions');
+  const pastEl = document.getElementById('past-sessions');
+
+  activeEl.innerHTML = active.length === 0 ? '<div class="empty-state">No one currently signed in.</div>' :
+    active.map(s => {
+      const eq = EQUIPMENT.find(e => e.id === s.equip_id);
+      const mins = Math.round((Date.now() - new Date(s.signed_in_at)) / 60000);
+      const dur = mins < 60 ? mins + ' min' : Math.floor(mins/60) + 'h ' + (mins%60) + 'm';
+      return `<div class="request-card">
+        <div class="req-status-bar" style="background:var(--green)"></div>
+        <div class="req-body">
+          <div class="req-top"><div><div class="req-name">${s.name}</div><div class="req-equip">${eq ? eq.name : s.equip_id} · ID ${s.student_id}</div></div>
+          <span class="badge badge-approved">Active · ${dur}</span></div>
+          <div class="req-meta"><span>⏱ Signed in ${new Date(s.signed_in_at).toLocaleTimeString()}</span></div>
+        </div></div>`;
+    }).join('');
+
+  pastEl.innerHTML = past.length === 0 ? '<div class="empty-state">No past sessions yet.</div>' :
+    past.map(s => {
+      const eq = EQUIPMENT.find(e => e.id === s.equip_id);
+      return `<div class="request-card">
+        <div class="req-status-bar" style="background:var(--hint)"></div>
+        <div class="req-body">
+          <div class="req-top"><div><div class="req-name">${s.name}</div><div class="req-equip">${eq ? eq.name : s.equip_id} · ID ${s.student_id}</div></div>
+          <span class="badge" style="background:var(--bg3);color:var(--muted)">${s.duration_minutes ?? '?'} min</span></div>
+          <div class="req-meta"><span>📅 ${s.signed_in_at.split('T')[0]}</span><span>🕐 ${new Date(s.signed_in_at).toLocaleTimeString()} → ${new Date(s.signed_out_at).toLocaleTimeString()}</span></div>
+        </div></div>`;
+    }).join('');
+}
+
+function exportSessionsCSV() {
+  if (!allSessions.length) { alert('No sessions to export.'); return; }
+  const hdrs = ['Name','Student ID','Equipment','Sign In','Sign Out','Duration (min)'];
+  const rows = allSessions.map(s => {
+    const eq = EQUIPMENT.find(e => e.id === s.equip_id);
+    const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+    return [esc(s.name), esc(s.student_id), esc(eq ? eq.name : s.equip_id), esc(s.signed_in_at), esc(s.signed_out_at ?? 'Active'), esc(s.duration_minutes ?? '')].join(',');
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([[hdrs.join(','), ...rows].join('\n')], {type:'text/csv'}));
+  a.download = 'lab-sessions-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+}
 
 async function initSupabase() {
   setSyncStatus(false, 'Connecting…');
