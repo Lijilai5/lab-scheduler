@@ -234,7 +234,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 // ════════════════════════════════════════════
 //  CONFIGURATION — fill in these three lines
 // ════════════════════════════════════════════
-const SUPABASE_URL  = 'https://jhbednwfcgrhusagyuhn.supabase.co';
+const SUPABASE_URL  = 'https://supabase.com/dashboard/project/jhbednwfcgrhusagyuhn';
 const SUPABASE_ANON = 'sb_publishable_b8sY-aUx8FzIGUuxVuOnOQ_EW-C2t1P';
 const ADMIN_PIN     = '1234';  // change this to your own PIN
 // ════════════════════════════════════════════
@@ -254,7 +254,7 @@ const EQUIPMENT = [
   { id: 'e12', name: 'Carver Press', category: 'Processing' },
   { id: 'e13', name: 'Batch Foaming Station', category: 'Processing' },
 ];
-const configured = SUPABASE_URL !== 'https://jhbednwfcgrhusagyuhn.supabase.co';
+const configured = SUPABASE_URL !== 'https://supabase.com/dashboard/project/jhbednwfcgrhusagyuhn';
 let db = null, allBookings = [], selectedEquip = null, weekOffset = 0, adminFilter = 'all', adminUnlocked = false, modalSlot = null;
 
 if (configured) {
