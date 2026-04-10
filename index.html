@@ -272,14 +272,15 @@ let allSessions = [];
 
 // Connect directly to Supabase
 db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-initSupabase();
-
-await fetchSessions();
-db.channel('sessions-live')
+initSupabase{
+  await fetchSessions();
+  db.channel('sessions-live')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, fetchSessions)
   .subscribe();
+};
 
-  async function fetchSessions() {
+
+async function fetchSessions() {
   const { data } = await db.from('sessions').select('*').order('signed_in_at', { ascending: false }).limit(100);
   if (data) { allSessions = data; if (document.getElementById('page-usage').classList.contains('active')) renderUsage(); }
 }
