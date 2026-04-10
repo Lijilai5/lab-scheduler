@@ -254,14 +254,12 @@ const EQUIPMENT = [
   { id: 'e12', name: 'Carver Press', category: 'Processing' },
   { id: 'e13', name: 'Batch Foaming Station', category: 'Processing' },
 ];
-const configured = SUPABASE_URL !== 'https://jhbednwfcgrhusagyuhn.supabase.co';
+// Initialize variables
 let db = null, allBookings = [], selectedEquip = null, weekOffset = 0, adminFilter = 'all', adminUnlocked = false, modalSlot = null;
 
-if (configured) {
-  document.getElementById('config-banner').style.display = 'none';
-  db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-  initSupabase();
-}
+// Connect directly to Supabase
+db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+initSupabase();
 
 async function initSupabase() {
   setSyncStatus(false, 'Connecting…');
