@@ -254,7 +254,7 @@ const EQUIPMENT = [
   { id: 'e12', name: 'Carver Press', category: 'Processing' },
   { id: 'e13', name: 'Batch Foaming Station', category: 'Processing' },
 ];
-const configured = SUPABASE_URL !== 'https://supabase.com/dashboard/project/jhbednwfcgrhusagyuhn';
+const configured = SUPABASE_URL !== 'https://jhbednwfcgrhusagyuhn.supabase.co';
 let db = null, allBookings = [], selectedEquip = null, weekOffset = 0, adminFilter = 'all', adminUnlocked = false, modalSlot = null;
 
 if (configured) {
