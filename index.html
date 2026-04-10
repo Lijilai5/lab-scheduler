@@ -272,12 +272,7 @@ let allSessions = [];
 
 // Connect directly to Supabase
 db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-initSupabase{
-  await fetchSessions();
-  db.channel('sessions-live')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, fetchSessions)
-  .subscribe();
-};
+initSupabase();
 
 
 async function fetchSessions() {
@@ -339,6 +334,10 @@ async function initSupabase() {
   db.channel('bookings-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchBookings)
     .subscribe();
+  await fetchSessions();
+  db.channel('sessions-live')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, fetchSessions)
+  .subscribe();
 }
 
 async function fetchBookings() {
