@@ -5,427 +5,189 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lab Equipment Scheduler</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
-  --bg: #f7f6f2;
-  --bg2: #ffffff;
-  --bg3: #efefea;
-  --border: rgba(0,0,0,0.08);
-  --border2: rgba(0,0,0,0.14);
-  --text: #1a1a18;
-  --muted: #6b6b63;
-  --hint: #a8a89e;
-  --accent: #1a1a18;
-  --green: #1a7a4a;
-  --green-bg: #e6f4ed;
-  --amber: #8a5e00;
-  --amber-bg: #fdf3dc;
-  --red: #9a2020;
-  --red-bg: #fdeaea;
-  --blue: #1a4d8a;
-  --blue-bg: #e8f0fa;
-  --radius: 8px;
-  --radius-lg: 14px;
+  --bg: #f7f6f2; --bg2: #ffffff; --bg3: #efefea;
+  --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.14);
+  --text: #1a1a18; --muted: #6b6b63; --hint: #a8a89e;
+  --green: #1a7a4a; --green-bg: #e6f4ed;
+  --amber: #8a5e00; --amber-bg: #fdf3dc;
+  --red: #9a2020; --red-bg: #fdeaea;
+  --radius: 8px; --radius-lg: 14px;
 }
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
 
-body {
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  font-size: 14px;
-}
+#config-banner { background: #fff3cd; border-bottom: 1px solid #f0c040; padding: 10px 32px; font-size: 13px; color: #7a5800; display: flex; align-items: center; gap: 10px; }
+#config-banner strong { font-weight: 600; }
+#config-banner a { color: #1a4d8a; text-decoration: underline; cursor: pointer; }
 
-/* NAV */
-nav {
-  background: var(--text);
-  color: #f7f6f2;
-  padding: 0 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 56px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-.nav-brand {
-  font-family: 'Syne', sans-serif;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.3px;
-}
+nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 100; }
+.nav-brand { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
 .nav-brand span { opacity: 0.45; font-weight: 400; }
 .nav-tabs { display: flex; gap: 4px; }
-.nav-tab {
-  font-size: 13px;
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: rgba(247,246,242,0.6);
-  cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: all 0.15s;
-}
+.nav-tab { font-size: 13px; padding: 6px 14px; border-radius: 6px; border: none; background: transparent; color: rgba(247,246,242,0.6); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
 .nav-tab:hover { color: #f7f6f2; background: rgba(255,255,255,0.08); }
 .nav-tab.active { background: rgba(255,255,255,0.15); color: #f7f6f2; }
-.nav-badge {
-  background: #e05c2a;
-  color: white;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 20px;
-  margin-left: 4px;
-}
+.nav-badge { background: #e05c2a; color: white; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 20px; margin-left: 4px; }
+.sync-indicator { font-size: 11px; color: rgba(247,246,242,0.45); display: flex; align-items: center; gap: 6px; }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #888; }
+.sync-dot.live { background: #4ade80; }
 
-/* PAGES */
 .page { display: none; padding: 32px; max-width: 1100px; margin: 0 auto; }
 .page.active { display: block; }
-
-/* PAGE HEADER */
 .page-header { margin-bottom: 28px; }
 .page-header h1 { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 600; letter-spacing: -0.5px; }
 .page-header p { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
-/* EQUIPMENT GRID */
-.equip-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-  margin-bottom: 32px;
-}
-.equip-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 18px;
-  cursor: pointer;
-  transition: all 0.15s;
-  position: relative;
-}
+.equip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 32px; }
+.equip-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; cursor: pointer; transition: all 0.15s; }
 .equip-card:hover { border-color: var(--border2); transform: translateY(-1px); }
 .equip-card.selected { border-color: var(--text); border-width: 1.5px; }
 .equip-name { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
 .equip-cat { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
 .equip-status { display: flex; align-items: center; gap: 6px; font-size: 11px; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; }
-.dot-free { background: var(--green); }
-.dot-busy { background: #e05c2a; }
-.dot-soon { background: var(--amber); }
+.dot-free { background: var(--green); } .dot-busy { background: #e05c2a; } .dot-soon { background: #f0a500; }
 .equip-next { font-size: 11px; color: var(--muted); margin-top: 6px; }
 
-/* WEEK GRID */
 .week-nav { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
 .week-nav h2 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 600; flex: 1; }
-.week-btn {
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-radius: var(--radius);
-  padding: 6px 14px;
-  font-size: 13px;
-  cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: background 0.1s;
-}
+.week-btn { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 6px 14px; font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .week-btn:hover { background: var(--bg3); }
-
 .schedule-wrap { overflow-x: auto; }
-.schedule-grid {
-  display: grid;
-  grid-template-columns: 70px repeat(7, 1fr);
-  gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  min-width: 620px;
-}
-.sg-header {
-  background: var(--text);
-  color: #f7f6f2;
-  padding: 10px 8px;
-  font-size: 11px;
-  font-weight: 500;
-  text-align: center;
-  font-family: 'Syne', sans-serif;
-}
+.schedule-grid { display: grid; grid-template-columns: 70px repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; min-width: 620px; }
+.sg-header { background: var(--text); color: #f7f6f2; padding: 10px 8px; font-size: 11px; font-weight: 500; text-align: center; font-family: 'Syne', sans-serif; }
 .sg-header.time-col { background: var(--bg3); color: var(--muted); }
-.sg-cell {
-  background: var(--bg2);
-  padding: 3px 4px;
-  min-height: 36px;
-  position: relative;
-  cursor: pointer;
-  transition: background 0.1s;
-}
+.sg-cell { background: var(--bg2); padding: 3px 4px; min-height: 36px; position: relative; cursor: pointer; transition: background 0.1s; }
 .sg-cell:hover { background: #f0efeb; }
 .sg-cell.hour-start { border-top: 1px solid var(--border); }
-.sg-time {
-  background: var(--bg3);
-  padding: 3px 6px;
-  font-size: 10px;
-  color: var(--hint);
-  display: flex;
-  align-items: center;
-  font-family: 'DM Sans', monospace;
-  min-height: 36px;
-}
+.sg-time { background: var(--bg3); padding: 3px 6px; font-size: 10px; color: var(--hint); display: flex; align-items: center; min-height: 36px; }
 .sg-time.hour-start { border-top: 1px solid var(--border); color: var(--muted); font-weight: 500; }
-.booking-block {
-  position: absolute;
-  left: 2px; right: 2px;
-  border-radius: 4px;
-  padding: 2px 5px;
-  font-size: 10px;
-  font-weight: 500;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  z-index: 2;
-  cursor: default;
-}
+.booking-block { position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 2px 5px; font-size: 10px; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; z-index: 2; cursor: default; }
 .block-approved { background: var(--green-bg); color: var(--green); border-left: 2px solid var(--green); }
 .block-pending  { background: var(--amber-bg); color: var(--amber); border-left: 2px solid #f0a500; }
 
-/* BOOKING FORM */
-.form-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 28px;
-  max-width: 560px;
-}
-.form-card h2 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 600; margin-bottom: 6px; }
-.form-card .sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+.form-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; max-width: 560px; }
 .form-row { margin-bottom: 18px; }
 .form-row label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
-.form-row input,
-.form-row select,
-.form-row textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border2);
-  border-radius: var(--radius);
-  font-size: 14px;
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  outline: none;
-  transition: border-color 0.15s;
-}
-.form-row input:focus,
-.form-row select:focus,
-.form-row textarea:focus { border-color: var(--text); }
+.form-row input, .form-row select, .form-row textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border2); border-radius: var(--radius); font-size: 14px; font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s; }
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--text); }
 .form-row textarea { resize: vertical; min-height: 80px; }
 .form-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.btn-submit {
-  background: var(--text);
-  color: #f7f6f2;
-  border: none;
-  border-radius: var(--radius);
-  padding: 12px 24px;
-  font-size: 14px;
-  font-weight: 500;
-  font-family: 'DM Sans', sans-serif;
-  cursor: pointer;
-  width: 100%;
-  transition: opacity 0.15s;
-}
+.btn-submit { background: var(--text); color: #f7f6f2; border: none; border-radius: var(--radius); padding: 12px 24px; font-size: 14px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; width: 100%; transition: opacity 0.15s; }
 .btn-submit:hover { opacity: 0.85; }
-.form-success {
-  display: none;
-  background: var(--green-bg);
-  color: var(--green);
-  border: 1px solid rgba(26,122,74,0.2);
-  border-radius: var(--radius);
-  padding: 14px 18px;
-  font-size: 13px;
-  margin-top: 16px;
-  line-height: 1.5;
-}
+.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.form-success { display: none; background: var(--green-bg); color: var(--green); border: 1px solid rgba(26,122,74,0.2); border-radius: var(--radius); padding: 14px 18px; font-size: 13px; margin-top: 16px; }
 
-/* ADMIN */
-.admin-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
+#pin-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 300; }
+#pin-screen.hidden { display: none; }
+.pin-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px 40px; text-align: center; max-width: 340px; width: 100%; }
+.pin-card h2 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+.pin-card p { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+.pin-input { width: 100%; padding: 12px; text-align: center; font-size: 22px; letter-spacing: 8px; border: 1px solid var(--border2); border-radius: var(--radius); background: var(--bg); color: var(--text); outline: none; margin-bottom: 8px; }
+.pin-input:focus { border-color: var(--text); }
+.pin-error { font-size: 12px; color: var(--red); min-height: 18px; margin-bottom: 12px; }
+.btn-pin { background: var(--text); color: #f7f6f2; border: none; border-radius: var(--radius); padding: 11px; font-size: 14px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; width: 100%; }
+
+.admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
 .filter-tabs { display: flex; gap: 6px; }
-.filter-tab {
-  font-size: 12px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--border2);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: all 0.12s;
-}
+.filter-tab { font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border2); background: transparent; color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.12s; }
 .filter-tab.active { background: var(--text); color: #f7f6f2; border-color: var(--text); }
 .request-list { display: flex; flex-direction: column; gap: 10px; }
-.request-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 18px 20px;
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-}
-.req-status-bar {
-  width: 3px;
-  border-radius: 2px;
-  align-self: stretch;
-  flex-shrink: 0;
-}
-.bar-pending  { background: #f0a500; }
-.bar-approved { background: var(--green); }
-.bar-rejected { background: var(--red); }
+.request-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; display: flex; align-items: flex-start; gap: 16px; }
+.req-status-bar { width: 3px; border-radius: 2px; align-self: stretch; flex-shrink: 0; }
+.bar-pending { background: #f0a500; } .bar-approved { background: var(--green); } .bar-rejected { background: var(--red); }
 .req-body { flex: 1; }
 .req-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .req-name { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; }
 .req-equip { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .req-meta { font-size: 12px; color: var(--muted); margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
-.req-purpose { font-size: 13px; color: var(--text); margin-top: 8px; padding: 8px 12px; background: var(--bg3); border-radius: 6px; }
+.req-purpose { font-size: 13px; margin-top: 8px; padding: 8px 12px; background: var(--bg3); border-radius: 6px; }
 .req-actions { display: flex; gap: 8px; margin-top: 12px; }
-.btn-approve, .btn-reject, .btn-small {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: opacity 0.12s;
-}
+.btn-approve, .btn-reject, .btn-small { font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .btn-approve { background: var(--green-bg); color: var(--green); }
 .btn-reject  { background: var(--red-bg); color: var(--red); }
 .btn-small   { background: var(--bg3); color: var(--muted); }
-.btn-approve:hover, .btn-reject:hover, .btn-small:hover { opacity: 0.75; }
-.badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 3px 9px;
-  border-radius: 20px;
-  letter-spacing: 0.2px;
-}
+.badge { font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
 .badge-pending  { background: var(--amber-bg); color: var(--amber); }
 .badge-approved { background: var(--green-bg); color: var(--green); }
 .badge-rejected { background: var(--red-bg); color: var(--red); }
-.empty-state {
-  text-align: center;
-  padding: 48px 24px;
-  color: var(--hint);
-  font-size: 13px;
-}
+.empty-state { text-align: center; padding: 48px 24px; color: var(--hint); font-size: 13px; }
 
-/* MODAL */
-.modal-overlay {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(26,26,24,0.5);
-  z-index: 200;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(26,26,24,0.5); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
 .modal-overlay.open { display: flex; }
-.modal {
-  background: var(--bg2);
-  border-radius: var(--radius-lg);
-  padding: 28px;
-  max-width: 460px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
+.modal { background: var(--bg2); border-radius: var(--radius-lg); padding: 28px; max-width: 460px; width: 100%; }
 .modal h3 { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 600; margin-bottom: 4px; }
 .modal .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
 .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
-.btn-cancel {
-  flex: 1; padding: 10px; border: 1px solid var(--border2); background: transparent;
-  border-radius: var(--radius); font-size: 14px; cursor: pointer; font-family: 'DM Sans', sans-serif;
-}
-.btn-confirm {
-  flex: 1; padding: 10px; background: var(--text); color: #f7f6f2;
-  border: none; border-radius: var(--radius); font-size: 14px; cursor: pointer; font-family: 'DM Sans', sans-serif;
-}
+.btn-cancel { flex: 1; padding: 10px; border: 1px solid var(--border2); background: transparent; border-radius: var(--radius); font-size: 14px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.btn-confirm { flex: 1; padding: 10px; background: var(--text); color: #f7f6f2; border: none; border-radius: var(--radius); font-size: 14px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 </style>
 </head>
 <body>
 
+<div id="config-banner">
+  <strong>Setup required:</strong> Open this file in a text editor, find the CONFIGURATION section, and paste your Supabase URL + anon key.
+  <a onclick="document.getElementById('config-banner').style.display='none'">Dismiss</a>
+</div>
+
+<div id="pin-screen" class="hidden">
+  <div class="pin-card">
+    <h2>Admin access</h2>
+    <p>Enter the admin PIN to continue</p>
+    <input class="pin-input" type="password" id="pin-input" maxlength="6" placeholder="••••" onkeydown="if(event.key==='Enter')checkPin()">
+    <div class="pin-error" id="pin-error"></div>
+    <button class="btn-pin" onclick="checkPin()">Unlock</button>
+  </div>
+</div>
+
 <nav>
   <div class="nav-brand">Lab Scheduler <span>/ Equipment Booking</span></div>
-  <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('schedule')">Schedule</button>
-    <button class="nav-tab" onclick="showPage('book')">Book equipment</button>
-    <button class="nav-tab" id="admin-tab" onclick="showPage('admin')">Admin <span class="nav-badge" id="pending-count" style="display:none">0</span></button>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="sync-indicator">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label">Not connected</span>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('schedule')">Schedule</button>
+      <button class="nav-tab" onclick="showPage('book')">Book equipment</button>
+      <button class="nav-tab" onclick="tryAdmin()">Admin <span class="nav-badge" id="pending-count" style="display:none">0</span></button>
+    </div>
   </div>
 </nav>
 
-<!-- SCHEDULE PAGE -->
 <div class="page active" id="page-schedule">
   <div class="page-header">
     <h1>Equipment availability</h1>
     <p>Click any equipment to view its weekly schedule. Click a free slot to make a booking.</p>
   </div>
-
   <div class="equip-grid" id="equip-grid"></div>
-
   <div id="schedule-section" style="display:none">
     <div class="week-nav">
-      <h2 id="week-label">Week of —</h2>
+      <h2 id="week-label">—</h2>
       <button class="week-btn" onclick="changeWeek(-1)">← Prev</button>
       <button class="week-btn" onclick="changeWeek(1)">Next →</button>
     </div>
-    <div class="schedule-wrap">
-      <div class="schedule-grid" id="schedule-grid"></div>
-    </div>
+    <div class="schedule-wrap"><div class="schedule-grid" id="schedule-grid"></div></div>
     <p style="font-size:11px;color:var(--hint);margin-top:10px;">
       <span style="display:inline-block;width:10px;height:10px;background:#e6f4ed;border-left:2px solid #1a7a4a;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Approved &nbsp;
-      <span style="display:inline-block;width:10px;height:10px;background:#fdf3dc;border-left:2px solid #f0a500;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Pending approval
+      <span style="display:inline-block;width:10px;height:10px;background:#fdf3dc;border-left:2px solid #f0a500;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Pending
     </p>
   </div>
 </div>
 
-<!-- BOOK PAGE -->
 <div class="page" id="page-book">
-  <div class="page-header">
-    <h1>Request a booking</h1>
-    <p>Fill in the form below. A staff member will approve or decline your request.</p>
-  </div>
+  <div class="page-header"><h1>Request a booking</h1><p>Fill in the form below. A staff member will approve or decline your request.</p></div>
   <div class="form-card">
-    <div class="form-row">
-      <label>Your name</label>
-      <input type="text" id="f-name" placeholder="e.g. Alex Kim">
-    </div>
-    <div class="form-row">
-      <label>Student / Staff ID</label>
-      <input type="text" id="f-id" placeholder="e.g. 1234567">
-    </div>
-    <div class="form-row">
-      <label>Email</label>
-      <input type="email" id="f-email" placeholder="you@university.edu">
-    </div>
-    <div class="form-row">
-      <label>Equipment</label>
-      <select id="f-equip"></select>
-    </div>
+    <div class="form-row"><label>Your name</label><input type="text" id="f-name" placeholder="e.g. Alex Kim"></div>
+    <div class="form-row"><label>Student / Staff ID</label><input type="text" id="f-id" placeholder="e.g. 1234567"></div>
+    <div class="form-row"><label>Email</label><input type="email" id="f-email" placeholder="you@university.edu"></div>
+    <div class="form-row"><label>Equipment</label><select id="f-equip"></select></div>
     <div class="form-cols">
-      <div class="form-row">
-        <label>Date</label>
-        <input type="date" id="f-date">
-      </div>
-      <div class="form-row">
-        <label>Start time</label>
-        <input type="time" id="f-start">
-      </div>
+      <div class="form-row"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="form-row"><label>Start time</label><input type="time" id="f-start"></div>
     </div>
     <div class="form-row">
       <label>Duration</label>
@@ -439,39 +201,33 @@ nav {
         <option value="480">Half day (8h)</option>
       </select>
     </div>
-    <div class="form-row">
-      <label>Purpose / project</label>
-      <textarea id="f-purpose" placeholder="Briefly describe what you'll be using the equipment for…"></textarea>
-    </div>
-    <button class="btn-submit" onclick="submitBooking()">Submit booking request</button>
-    <div class="form-success" id="form-success">
-      Your booking request has been submitted and is pending staff approval.<br>You'll be notified once it's reviewed.
-    </div>
+    <div class="form-row"><label>Purpose / project</label><textarea id="f-purpose" placeholder="Briefly describe what you'll be using the equipment for…"></textarea></div>
+    <button class="btn-submit" id="submit-btn" onclick="submitBooking()">Submit booking request</button>
+    <div class="form-success" id="form-success">Your request has been submitted and is pending staff approval.</div>
   </div>
 </div>
 
-<!-- ADMIN PAGE -->
 <div class="page" id="page-admin">
   <div class="admin-header">
-    <div class="page-header" style="margin:0">
-      <h1>Booking requests</h1>
-      <p>Approve or decline student equipment requests.</p>
-    </div>
-    <div class="filter-tabs">
-      <button class="filter-tab active" onclick="setFilter('all', this)">All</button>
-      <button class="filter-tab" onclick="setFilter('pending', this)">Pending</button>
-      <button class="filter-tab" onclick="setFilter('approved', this)">Approved</button>
-      <button class="filter-tab" onclick="setFilter('rejected', this)">Declined</button>
+    <div class="page-header" style="margin:0"><h1>Booking requests</h1><p>Approve or decline requests. Updates sync live across all devices.</p></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-tab" onclick="setFilter('pending',this)">Pending</button>
+        <button class="filter-tab" onclick="setFilter('approved',this)">Approved</button>
+        <button class="filter-tab" onclick="setFilter('rejected',this)">Declined</button>
+      </div>
+      <button onclick="exportCSV()" style="font-size:12px;font-weight:500;padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;">Download CSV</button>
+      <button onclick="adminLogout()" style="font-size:12px;padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;">Lock</button>
     </div>
   </div>
-  <div class="request-list" id="request-list"></div>
+  <div class="request-list" id="request-list"><div class="empty-state">Loading…</div></div>
 </div>
 
-<!-- MODAL -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <h3 id="modal-title">Book this slot</h3>
-    <p class="modal-sub" id="modal-sub">Fill in your details on the booking form.</p>
+    <p class="modal-sub" id="modal-sub"></p>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-confirm" onclick="goToBookForm()">Go to booking form →</button>
@@ -480,7 +236,14 @@ nav {
 </div>
 
 <script>
-// ── DATA ──────────────────────────────────────────────────────────
+// ════════════════════════════════════════════
+//  CONFIGURATION — fill in these three lines
+// ════════════════════════════════════════════
+const SUPABASE_URL  = 'https://supabase.com/dashboard/project/jhbednwfcgrhusagyuhn';
+const SUPABASE_ANON = 'sb_publishable_b8sY-aUx8FzIGUuxVuOnOQ_EW-C2t1P';
+const ADMIN_PIN     = '1234';  // change this to your own PIN
+// ════════════════════════════════════════════
+
 const EQUIPMENT = [
   { id: 'e1', name: 'Fast Scanning Calorimeter', category: 'Characterization' },
   { id: 'e2', name: 'Differential Scanning Calorimeter', category: 'Characterization' },
@@ -496,314 +259,223 @@ const EQUIPMENT = [
   { id: 'e12', name: 'Carver Press', category: 'Processing' },
   { id: 'e13', name: 'Batch Foaming Station', category: 'Processing' },
 ];
+const configured = SUPABASE_URL !== 'https://supabase.com/dashboard/project/jhbednwfcgrhusagyuhn';
+let db = null, allBookings = [], selectedEquip = null, weekOffset = 0, adminFilter = 'all', adminUnlocked = false, modalSlot = null;
 
-function loadBookings() {
-  try { return JSON.parse(localStorage.getItem('lab_bookings') || '[]'); } catch { return []; }
-}
-function saveBookings(b) { localStorage.setItem('lab_bookings', JSON.stringify(b)); }
-
-// Seed demo data if empty
-function seedDemo() {
-  if (loadBookings().length > 0) return;
-  const today = new Date();
-  const fmt = d => d.toISOString().split('T')[0];
-  const d0 = fmt(today);
-  const d1 = fmt(new Date(today.getTime() + 86400000));
-  const d2 = fmt(new Date(today.getTime() + 2*86400000));
-  const demos = [
-    { id: uid(), name: 'Maria Santos', studentId: '1001', email: 'msantos@uni.edu', equipId: 'e3', date: d0, start: '09:00', duration: 120, purpose: 'Printing structural components for robotics project.', status: 'approved', created: Date.now()-3600000 },
-    { id: uid(), name: 'James Okafor', studentId: '1002', email: 'jokafor@uni.edu', equipId: 'e1', date: d0, start: '13:00', duration: 60, purpose: 'Signal analysis for lab 4 assignment.', status: 'pending', created: Date.now()-1800000 },
-    { id: uid(), name: 'Priya Nair', studentId: '1003', email: 'pnair@uni.edu', equipId: 'e5', date: d1, start: '10:00', duration: 90, purpose: 'Cutting acrylic panels for enclosure design.', status: 'pending', created: Date.now()-900000 },
-    { id: uid(), name: 'Tom Becker', studentId: '1004', email: 'tbecker@uni.edu', equipId: 'e9', date: d2, start: '14:00', duration: 60, purpose: 'Chemical synthesis experiment — CHEM301.', status: 'approved', created: Date.now()-7200000 },
-  ];
-  saveBookings(demos);
+if (configured) {
+  document.getElementById('config-banner').style.display = 'none';
+  db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  initSupabase();
 }
 
-function uid() { return Math.random().toString(36).slice(2,10); }
+async function initSupabase() {
+  setSyncStatus(false, 'Connecting…');
+  await fetchBookings();
+  setSyncStatus(true, 'Live');
+  db.channel('bookings-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchBookings)
+    .subscribe();
+}
 
-// ── STATE ─────────────────────────────────────────────────────────
-let selectedEquip = null;
-let weekOffset = 0;
-let adminFilter = 'all';
-let modalSlot = null;
+async function fetchBookings() {
+  const { data, error } = await db.from('bookings').select('*').order('created_at', { ascending: false });
+  if (!error && data) {
+    allBookings = data;
+    renderEquipGrid();
+    if (selectedEquip) renderWeekGrid();
+    updatePendingBadge();
+    if (document.getElementById('page-admin').classList.contains('active')) renderAdmin();
+  }
+}
 
-// ── NAVIGATION ────────────────────────────────────────────────────
+function setSyncStatus(live, label) {
+  document.getElementById('sync-dot').className = 'sync-dot' + (live ? ' live' : '');
+  document.getElementById('sync-label').textContent = label;
+}
+
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  document.querySelectorAll('.nav-tab').forEach(t => {
-    if (t.textContent.toLowerCase().includes(name === 'admin' ? 'admin' : name === 'book' ? 'book' : 'schedule')) t.classList.add('active');
-  });
+  document.querySelectorAll('.nav-tab').forEach(t => { if (t.textContent.toLowerCase().includes(name === 'admin' ? 'admin' : name === 'book' ? 'book' : 'schedule')) t.classList.add('active'); });
   if (name === 'admin') renderAdmin();
   if (name === 'schedule') renderEquipGrid();
-  updatePendingBadge();
 }
 
 function updatePendingBadge() {
-  const count = loadBookings().filter(b => b.status === 'pending').length;
-  const badge = document.getElementById('pending-count');
-  badge.textContent = count;
-  badge.style.display = count > 0 ? 'inline' : 'none';
+  const n = allBookings.filter(b => b.status === 'pending').length;
+  const el = document.getElementById('pending-count');
+  el.textContent = n; el.style.display = n > 0 ? 'inline' : 'none';
 }
 
-// ── SCHEDULE PAGE ─────────────────────────────────────────────────
+function tryAdmin() {
+  if (adminUnlocked) { showPage('admin'); return; }
+  document.getElementById('pin-screen').classList.remove('hidden');
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-error').textContent = '';
+  setTimeout(() => document.getElementById('pin-input').focus(), 50);
+}
+function checkPin() {
+  if (document.getElementById('pin-input').value === ADMIN_PIN) {
+    adminUnlocked = true;
+    document.getElementById('pin-screen').classList.add('hidden');
+    showPage('admin');
+  } else {
+    document.getElementById('pin-error').textContent = 'Incorrect PIN. Try again.';
+    document.getElementById('pin-input').value = '';
+  }
+}
+function adminLogout() { adminUnlocked = false; showPage('schedule'); }
+
 function renderEquipGrid() {
-  const bookings = loadBookings();
   const now = new Date();
   const grid = document.getElementById('equip-grid');
   grid.innerHTML = '';
-
   EQUIPMENT.forEach(eq => {
-    const eqBookings = bookings.filter(b => b.equipId === eq.id && b.status === 'approved');
-    const active = eqBookings.find(b => {
-      const start = new Date(b.date + 'T' + b.start);
-      const end = new Date(start.getTime() + b.duration * 60000);
-      return start <= now && now <= end;
-    });
-    const upcoming = eqBookings.filter(b => new Date(b.date + 'T' + b.start) > now)
-      .sort((a,b) => new Date(a.date+'T'+a.start) - new Date(b.date+'T'+b.start))[0];
-
-    let statusDot = 'dot-free', statusText = 'Available now';
-    if (active) { statusDot = 'dot-busy'; statusText = 'In use'; }
-    else if (upcoming) {
-      const diff = (new Date(upcoming.date+'T'+upcoming.start) - now) / 60000;
-      if (diff < 60) { statusDot = 'dot-soon'; statusText = 'Booked soon'; }
-    }
-
+    const eqB = allBookings.filter(b => b.equip_id === eq.id && b.status === 'approved');
+    const active = eqB.find(b => { const s = new Date(b.date+'T'+b.start_time), e = new Date(s.getTime()+b.duration*60000); return s<=now && now<=e; });
+    const upcoming = eqB.filter(b => new Date(b.date+'T'+b.start_time)>now).sort((a,c)=>new Date(a.date+'T'+a.start_time)-new Date(c.date+'T'+c.start_time))[0];
+    let dot='dot-free', txt='Available now';
+    if (active) { dot='dot-busy'; txt='In use'; }
+    else if (upcoming && (new Date(upcoming.date+'T'+upcoming.start_time)-now)/60000<60) { dot='dot-soon'; txt='Booked soon'; }
     const card = document.createElement('div');
-    card.className = 'equip-card' + (selectedEquip === eq.id ? ' selected' : '');
-    card.innerHTML = `
-      <div class="equip-name">${eq.name}</div>
-      <div class="equip-cat">${eq.category}</div>
-      <div class="equip-status"><span class="status-dot ${statusDot}"></span>${statusText}</div>
-      ${upcoming ? `<div class="equip-next">Next: ${upcoming.date} ${upcoming.start}</div>` : ''}
-    `;
+    card.className = 'equip-card'+(selectedEquip===eq.id?' selected':'');
+    card.innerHTML = `<div class="equip-name">${eq.name}</div><div class="equip-cat">${eq.category}</div><div class="equip-status"><span class="status-dot ${dot}"></span>${txt}</div>${upcoming?`<div class="equip-next">Next: ${upcoming.date} ${upcoming.start_time}</div>`:''}`;
     card.onclick = () => selectEquip(eq.id);
     grid.appendChild(card);
   });
 }
 
 function selectEquip(id) {
-  selectedEquip = id;
-  weekOffset = 0;
-  renderEquipGrid();
+  selectedEquip = id; weekOffset = 0; renderEquipGrid();
   document.getElementById('schedule-section').style.display = 'block';
   renderWeekGrid();
-  document.getElementById('schedule-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('schedule-section').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 function getWeekDates(offset) {
-  const now = new Date();
-  const day = now.getDay();
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
-  monday.setHours(0,0,0,0);
-  return Array.from({length:7}, (_,i) => {
-    const d = new Date(monday); d.setDate(monday.getDate() + i); return d;
-  });
+  const now = new Date(), day = now.getDay();
+  const mon = new Date(now);
+  mon.setDate(now.getDate()-(day===0?6:day-1)+offset*7); mon.setHours(0,0,0,0);
+  return Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
 }
-
-function changeWeek(dir) { weekOffset += dir; renderWeekGrid(); }
+function changeWeek(dir) { weekOffset+=dir; renderWeekGrid(); }
 
 function renderWeekGrid() {
   const days = getWeekDates(weekOffset);
-  const bookings = loadBookings();
-  const eq = EQUIPMENT.find(e => e.id === selectedEquip);
-
-  const label = document.getElementById('week-label');
-  label.textContent = eq.name + ' — ' + days[0].toLocaleDateString('en-CA', {month:'short', day:'numeric'}) + ' – ' + days[6].toLocaleDateString('en-CA', {month:'short', day:'numeric', year:'numeric'});
-
+  const eq = EQUIPMENT.find(e => e.id===selectedEquip);
+  document.getElementById('week-label').textContent = eq.name+' — '+days[0].toLocaleDateString('en-CA',{month:'short',day:'numeric'})+' – '+days[6].toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});
   const grid = document.getElementById('schedule-grid');
   grid.innerHTML = '';
-
-  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  // Headers
+  const dn = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   grid.innerHTML += `<div class="sg-header time-col">Time</div>`;
-  days.forEach((d, i) => {
-    const isToday = d.toDateString() === new Date().toDateString();
-    grid.innerHTML += `<div class="sg-header" style="${isToday ? 'background:#3a3a36' : ''}">${dayNames[i]}<br><span style="font-size:10px;opacity:0.6">${d.getDate()}</span></div>`;
-  });
-
-  // 48 half-hour slots (0:00 – 23:30)
-  for (let slot = 0; slot < 48; slot++) {
-    const hour = Math.floor(slot / 2);
-    const min = slot % 2 === 0 ? '00' : '30';
-    const isHourStart = slot % 2 === 0;
-    const timeStr = `${String(hour).padStart(2,'0')}:${min}`;
-
-    grid.innerHTML += `<div class="sg-time${isHourStart ? ' hour-start' : ''}">${isHourStart ? timeStr : ''}</div>`;
-
+  days.forEach((d,i) => { const today = d.toDateString()===new Date().toDateString(); grid.innerHTML += `<div class="sg-header" style="${today?'background:#3a3a36':''}">${dn[i]}<br><span style="font-size:10px;opacity:0.6">${d.getDate()}</span></div>`; });
+  for (let slot=0;slot<48;slot++) {
+    const h=Math.floor(slot/2), m=slot%2===0?'00':'30', isHour=slot%2===0;
+    const ts=`${String(h).padStart(2,'0')}:${m}`;
+    grid.innerHTML += `<div class="sg-time${isHour?' hour-start':''}">${isHour?ts:''}</div>`;
     days.forEach(day => {
-      const dateStr = day.toISOString().split('T')[0];
-      const cellStart = new Date(dateStr + 'T' + timeStr);
-      const cellEnd = new Date(cellStart.getTime() + 30 * 60000);
-
-      // Find any booking overlapping this cell
-      const overlap = bookings.find(b => {
-        if (b.equipId !== selectedEquip) return false;
-        const bs = new Date(b.date + 'T' + b.start);
-        const be = new Date(bs.getTime() + b.duration * 60000);
-        return bs < cellEnd && be > cellStart;
-      });
-
-      const cell = document.createElement('div');
-      cell.className = 'sg-cell' + (isHourStart ? ' hour-start' : '');
-
-      if (overlap) {
-        const bs = new Date(overlap.date + 'T' + overlap.start);
-        // Only show label on first slot of booking
-        if (Math.abs(bs - cellStart) < 30*60000 && bs >= cellStart) {
-          const slots = Math.ceil(overlap.duration / 30);
-          const block = document.createElement('div');
-          block.className = 'booking-block ' + (overlap.status === 'approved' ? 'block-approved' : 'block-pending');
-          block.style.height = (slots * 36 - 4) + 'px';
-          block.style.top = '2px';
-          block.textContent = overlap.name;
-          block.title = `${overlap.name} · ${overlap.start} · ${overlap.duration}min · ${overlap.status}`;
-          cell.appendChild(block);
+      const ds=day.toISOString().split('T')[0], cs=new Date(ds+'T'+ts), ce=new Date(cs.getTime()+30*60000);
+      const ov=allBookings.find(b=>{ if(b.equip_id!==selectedEquip)return false; const bs=new Date(b.date+'T'+b.start_time),be=new Date(bs.getTime()+b.duration*60000); return bs<ce&&be>cs; });
+      const cell=document.createElement('div');
+      cell.className='sg-cell'+(isHour?' hour-start':'');
+      if (ov) {
+        const bs=new Date(ov.date+'T'+ov.start_time);
+        if (Math.abs(bs-cs)<30*60000&&bs>=cs) {
+          const slots=Math.ceil(ov.duration/30), blk=document.createElement('div');
+          blk.className='booking-block '+(ov.status==='approved'?'block-approved':'block-pending');
+          blk.style.height=(slots*36-4)+'px'; blk.style.top='2px';
+          blk.textContent=ov.name; blk.title=`${ov.name} · ${ov.start_time} · ${ov.duration}min · ${ov.status}`;
+          cell.appendChild(blk);
         }
-        cell.style.cursor = 'default';
-      } else {
-        cell.onclick = () => openModal(dateStr, timeStr, eq);
-        cell.title = 'Click to book ' + timeStr;
-      }
-
+        cell.style.cursor='default';
+      } else { cell.onclick=()=>openModal(ds,ts,eq); cell.title='Click to book '+ts; }
       grid.appendChild(cell);
     });
   }
 }
 
-// ── BOOKING FORM ──────────────────────────────────────────────────
 function populateEquipSelect() {
-  const sel = document.getElementById('f-equip');
-  sel.innerHTML = EQUIPMENT.map(e => `<option value="${e.id}">${e.name} (${e.category})</option>`).join('');
+  document.getElementById('f-equip').innerHTML = EQUIPMENT.map(e=>`<option value="${e.id}">${e.name} (${e.category})</option>`).join('');
 }
 
-function submitBooking() {
-  const name = document.getElementById('f-name').value.trim();
-  const sid  = document.getElementById('f-id').value.trim();
-  const email = document.getElementById('f-email').value.trim();
-  const equipId = document.getElementById('f-equip').value;
-  const date = document.getElementById('f-date').value;
-  const start = document.getElementById('f-start').value;
-  const duration = parseInt(document.getElementById('f-duration').value);
-  const purpose = document.getElementById('f-purpose').value.trim();
-
-  if (!name || !sid || !email || !date || !start || !purpose) {
-    alert('Please fill in all fields.'); return;
+async function submitBooking() {
+  const name=document.getElementById('f-name').value.trim(), sid=document.getElementById('f-id').value.trim(),
+        email=document.getElementById('f-email').value.trim(), equipId=document.getElementById('f-equip').value,
+        date=document.getElementById('f-date').value, start=document.getElementById('f-start').value,
+        duration=parseInt(document.getElementById('f-duration').value), purpose=document.getElementById('f-purpose').value.trim();
+  if (!name||!sid||!email||!date||!start||!purpose) { alert('Please fill in all fields.'); return; }
+  const btn=document.getElementById('submit-btn');
+  btn.disabled=true; btn.textContent='Submitting…';
+  if (configured) {
+    const { error } = await db.from('bookings').insert([{ name, student_id:sid, email, equip_id:equipId, date, start_time:start, duration, purpose, status:'pending' }]);
+    if (error) { alert('Submit error: '+error.message); btn.disabled=false; btn.textContent='Submit booking request'; return; }
   }
-
-  const bookings = loadBookings();
-  bookings.push({ id: uid(), name, studentId: sid, email, equipId, date, start, duration, purpose, status: 'pending', created: Date.now() });
-  saveBookings(bookings);
-  updatePendingBadge();
-
-  document.getElementById('form-success').style.display = 'block';
-  document.getElementById('f-name').value = '';
-  document.getElementById('f-id').value = '';
-  document.getElementById('f-email').value = '';
-  document.getElementById('f-purpose').value = '';
-  setTimeout(() => document.getElementById('form-success').style.display = 'none', 5000);
+  btn.disabled=false; btn.textContent='Submit booking request';
+  document.getElementById('form-success').style.display='block';
+  ['f-name','f-id','f-email','f-purpose'].forEach(id=>document.getElementById(id).value='');
+  setTimeout(()=>document.getElementById('form-success').style.display='none',5000);
 }
 
-// ── ADMIN ─────────────────────────────────────────────────────────
-function setFilter(f, el) {
-  adminFilter = f;
-  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  renderAdmin();
-}
+function setFilter(f,el) { adminFilter=f; document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); renderAdmin(); }
 
 function renderAdmin() {
-  let bookings = loadBookings();
-  if (adminFilter !== 'all') bookings = bookings.filter(b => b.status === adminFilter);
-  bookings.sort((a,b) => {
-    if (a.status === 'pending' && b.status !== 'pending') return -1;
-    if (b.status === 'pending' && a.status !== 'pending') return 1;
-    return b.created - a.created;
-  });
-
-  const list = document.getElementById('request-list');
-  if (bookings.length === 0) {
-    list.innerHTML = `<div class="empty-state">No ${adminFilter === 'all' ? '' : adminFilter} requests found.</div>`;
-    return;
-  }
-
-  list.innerHTML = bookings.map(b => {
-    const eq = EQUIPMENT.find(e => e.id === b.equipId);
-    const endTime = (() => {
-      const [h,m] = b.start.split(':').map(Number);
-      const total = h*60 + m + b.duration;
-      return String(Math.floor(total/60)).padStart(2,'0') + ':' + String(total%60).padStart(2,'0');
-    })();
-    const isPending = b.status === 'pending';
-    return `
-    <div class="request-card">
+  let bk=[...allBookings];
+  if (adminFilter!=='all') bk=bk.filter(b=>b.status===adminFilter);
+  bk.sort((a,b)=>{ if(a.status==='pending'&&b.status!=='pending')return -1; if(b.status==='pending'&&a.status!=='pending')return 1; return new Date(b.created_at)-new Date(a.created_at); });
+  const list=document.getElementById('request-list');
+  if (bk.length===0) { list.innerHTML=`<div class="empty-state">No ${adminFilter==='all'?'':adminFilter} requests.</div>`; return; }
+  list.innerHTML=bk.map(b=>{
+    const eq=EQUIPMENT.find(e=>e.id===b.equip_id);
+    const [h,m]=b.start_time.split(':').map(Number), tot=h*60+m+b.duration;
+    const et=String(Math.floor(tot/60)).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');
+    return `<div class="request-card">
       <div class="req-status-bar bar-${b.status}"></div>
       <div class="req-body">
-        <div class="req-top">
-          <div>
-            <div class="req-name">${b.name}</div>
-            <div class="req-equip">${eq ? eq.name : b.equipId} · ID ${b.studentId}</div>
-          </div>
-          <span class="badge badge-${b.status}">${b.status.charAt(0).toUpperCase()+b.status.slice(1)}</span>
-        </div>
-        <div class="req-meta">
-          <span>📅 ${b.date}</span>
-          <span>🕐 ${b.start} – ${endTime}</span>
-          <span>⏱ ${b.duration} min</span>
-          <span>✉️ ${b.email}</span>
-        </div>
+        <div class="req-top"><div><div class="req-name">${b.name}</div><div class="req-equip">${eq?eq.name:b.equip_id} · ID ${b.student_id}</div></div><span class="badge badge-${b.status}">${b.status.charAt(0).toUpperCase()+b.status.slice(1)}</span></div>
+        <div class="req-meta"><span>📅 ${b.date}</span><span>🕐 ${b.start_time} – ${et}</span><span>⏱ ${b.duration} min</span><span>✉️ ${b.email}</span></div>
         <div class="req-purpose">${b.purpose}</div>
-        ${isPending ? `
-        <div class="req-actions">
-          <button class="btn-approve" onclick="updateStatus('${b.id}','approved')">Approve</button>
-          <button class="btn-reject"  onclick="updateStatus('${b.id}','rejected')">Decline</button>
-        </div>` : `
-        <div class="req-actions">
-          ${b.status !== 'pending' ? `<button class="btn-small" onclick="updateStatus('${b.id}','pending')">Reset to pending</button>` : ''}
-        </div>`}
-      </div>
-    </div>`;
+        <div class="req-actions">${b.status==='pending'?`<button class="btn-approve" onclick="updateStatus('${b.id}','approved')">Approve</button><button class="btn-reject" onclick="updateStatus('${b.id}','rejected')">Decline</button>`:`<button class="btn-small" onclick="updateStatus('${b.id}','pending')">Reset to pending</button>`}</div>
+      </div></div>`;
   }).join('');
 }
 
-function updateStatus(id, status) {
-  const bookings = loadBookings();
-  const b = bookings.find(x => x.id === id);
-  if (b) { b.status = status; saveBookings(bookings); }
-  renderAdmin();
-  updatePendingBadge();
-  if (selectedEquip) renderWeekGrid();
+async function updateStatus(id, status) {
+  if (!configured) return;
+  await db.from('bookings').update({ status }).eq('id', id);
 }
 
-// ── MODAL ─────────────────────────────────────────────────────────
-function openModal(dateStr, timeStr, eq) {
-  modalSlot = { dateStr, timeStr, eq };
-  document.getElementById('modal-title').textContent = 'Book ' + eq.name;
-  document.getElementById('modal-sub').textContent = dateStr + ' from ' + timeStr + ' — you\'ll be taken to the booking form.';
+function exportCSV() {
+  if (!allBookings.length) { alert('No bookings to export.'); return; }
+  const hdrs=['Name','Student ID','Email','Equipment','Category','Date','Start Time','Duration (min)','End Time','Purpose','Status','Submitted'];
+  const rows=allBookings.map(b=>{
+    const eq=EQUIPMENT.find(e=>e.id===b.equip_id);
+    const [h,m]=b.start_time.split(':').map(Number), tot=h*60+m+b.duration;
+    const et=String(Math.floor(tot/60)).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');
+    const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
+    return [esc(b.name),esc(b.student_id),esc(b.email),esc(eq?eq.name:b.equip_id),esc(eq?eq.category:''),esc(b.date),esc(b.start_time),esc(b.duration),esc(et),esc(b.purpose),esc(b.status),esc(new Date(b.created_at).toLocaleString())].join(',');
+  });
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([[hdrs.join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'}));
+  a.download='lab-bookings-'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+}
+
+function openModal(ds,ts,eq) {
+  modalSlot={ds,ts,eq};
+  document.getElementById('modal-title').textContent='Book '+eq.name;
+  document.getElementById('modal-sub').textContent=ds+' from '+ts;
   document.getElementById('modal').classList.add('open');
 }
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 function goToBookForm() {
   closeModal();
-  if (modalSlot) {
-    document.getElementById('f-equip').value = modalSlot.eq.id;
-    document.getElementById('f-date').value = modalSlot.dateStr;
-    document.getElementById('f-start').value = modalSlot.timeStr;
-  }
+  if (modalSlot) { document.getElementById('f-equip').value=modalSlot.eq.id; document.getElementById('f-date').value=modalSlot.ds; document.getElementById('f-start').value=modalSlot.ts; }
   showPage('book');
 }
 
-// ── INIT ──────────────────────────────────────────────────────────
-// seedDemo();
 populateEquipSelect();
 renderEquipGrid();
-updatePendingBadge();
-
-// Set date default to today
-document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
 </script>
 </body>
 </html>
