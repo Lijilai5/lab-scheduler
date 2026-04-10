@@ -400,10 +400,10 @@ async function submitBooking() {
   if (!name||!sid||!email||!date||!start||!purpose) { alert('Please fill in all fields.'); return; }
   const btn=document.getElementById('submit-btn');
   btn.disabled=true; btn.textContent='Submitting…';
-  if (configured) {
-    const { error } = await db.from('bookings').insert([{ name, student_id:sid, email, equip_id:equipId, date, start_time:start, duration, purpose, status:'pending' }]);
-    if (error) { alert('Submit error: '+error.message); btn.disabled=false; btn.textContent='Submit booking request'; return; }
-  }
+
+  const { error } = await db.from('bookings').insert([{ name, student_id:sid, email, equip_id:equipId, date, start_time:start, duration, purpose, status:'pending' }]);
+  if (error) { alert('Submit error: '+error.message); btn.disabled=false; btn.textContent='Submit booking request'; return; }
+  
   btn.disabled=false; btn.textContent='Submit booking request';
   document.getElementById('form-success').style.display='block';
   ['f-name','f-id','f-email','f-purpose'].forEach(id=>document.getElementById(id).value='');
@@ -434,7 +434,7 @@ function renderAdmin() {
 }
 
 async function updateStatus(id, status) {
-  if (!configured) return;
+
   await db.from('bookings').update({ status }).eq('id', id);
 }
 
