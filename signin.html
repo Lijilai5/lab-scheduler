@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root { --bg:#f7f6f2; --bg2:#fff; --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.14); --text:#1a1a18; --muted:#6b6b63; --green:#1a7a4a; --green-bg:#e6f4ed; --red:#9a2020; --red-bg:#fdeaea; --radius:8px; --radius-lg:14px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); padding:32px 28px; max-width:360px; width:100%; text-align:center; }
+.equip-icon { width:52px; height:52px; border-radius:50%; background:var(--bg); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; font-size:24px; }
+.cat-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+.equip-name { font-size:20px; font-weight:500; margin-bottom:24px; }
+.form-row { margin-bottom:14px; text-align:left; }
+.form-row label { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:500; text-transform:uppercase; letter-spacing:0.3px; }
+.form-row input { width:100%; padding:10px 12px; border:1px solid var(--border2); border-radius:var(--radius); font-size:15px; font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); outline:none; }
+.form-row input:focus { border-color:var(--text); }
+.btn { width:100%; padding:12px; border:none; border-radius:var(--radius); font-size:15px; font-weight:500; font-family:'DM Sans',sans-serif; cursor:pointer; margin-top:4px; transition:opacity 0.15s; }
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-signin { background:var(--text); color:#f7f6f2; }
+.btn-signout { background:var(--red-bg); color:var(--red); }
+.status-active { background:var(--green-bg); border-radius:var(--radius); padding:16px; margin-bottom:20px; }
+.status-active .who { font-size:17px; font-weight:500; color:var(--green); }
+.status-active .since { font-size:13px; color:var(--green); opacity:0.8; margin-top:3px; }
+.msg { font-size:13px; color:var(--muted); margin-top:14px; }
+.success-flash { background:var(--green-bg); color:var(--green); border-radius:var(--radius); padding:14px; font-size:14px; margin-top:14px; display:none; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="equip-icon">🔬</div>
+  <div class="cat-label" id="cat-label">Equipment</div>
+  <div class="equip-name" id="equip-name">Loading…</div>
+  <div id="main-content"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://jhbednwfcgrhusagyuhn.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_b8sY-aUx8FzIGUuxVuOnOQ_EW-C2t1P';
+
+const EQUIPMENT = [
+  { id:'e1', name:'Fast Scanning Calorimeter', category:'Characterization', icon:'🌡️' },
+  { id:'e2', name:'Differential Scanning Calorimeter', category:'Characterization', icon:'🌡️' },
+  { id:'e3', name:'Instron Tensile', category:'Characterization', icon:'⚙️' },
+  { id:'e4', name:'Instron Impact', category:'Characterization', icon:'⚙️' },
+  { id:'e5', name:'Rheometer', category:'Characterization', icon:'🔬' },
+  { id:'e6', name:'DMA', category:'Characterization', icon:'📊' },
+  { id:'e7', name:'Ox-tran', category:'Characterization', icon:'💨' },
+  { id:'e8', name:'Vacuum Oven #1', category:'Processing', icon:'♨️' },
+  { id:'e9', name:'Vacuum Oven #2', category:'Processing', icon:'♨️' },
+  { id:'e10', name:'Vacuum Oven #3', category:'Processing', icon:'♨️' },
+  { id:'e11', name:'Sonicator', category:'Processing', icon:'🔊' },
+  { id:'e12', name:'Carver Press', category:'Processing', icon:'🗜️' },
+  { id:'e13', name:'Batch Foaming Station', category:'Processing', icon:'🧪' },
+];
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const params = new URLSearchParams(location.search);
+const machineId = params.get('machine');
+const eq = EQUIPMENT.find(e => e.id === machineId);
+
+if (!eq) {
+  document.getElementById('equip-name').textContent = 'Unknown machine';
+  document.getElementById('main-content').innerHTML = '<p style="color:#9a2020;font-size:13px">No machine ID found in QR code. Please rescan.</p>';
+} else {
+  document.getElementById('equip-name').textContent = eq.name;
+  document.getElementById('cat-label').textContent = eq.category;
+  document.querySelector('.equip-icon').textContent = eq.icon;
+  init();
+}
+
+async function init() {
+  const { data } = await db.from('sessions').select('*').eq('equip_id', machineId).is('signed_out_at', null).order('signed_in_at', { ascending: false }).limit(1);
+  const active = data && data[0];
+  renderUI(active);
+}
+
+function timeSince(dateStr) {
+  const diff = Math.floor((Date.now() - new Date(dateStr)) / 60000);
+  if (diff < 1) return 'just now';
+  if (diff < 60) return diff + ' min ago';
+  const h = Math.floor(diff / 60), m = diff % 60;
+  return h + 'h ' + (m > 0 ? m + 'm' : '') + ' ago';
+}
+
+function renderUI(activeSession) {
+  const el = document.getElementById('main-content');
+  if (activeSession) {
+    el.innerHTML = `
+      <div class="status-active">
+        <div class="who">${activeSession.name}</div>
+        <div class="since">Signed in ${timeSince(activeSession.signed_in_at)}</div>
+      </div>
+      <button class="btn btn-signout" id="action-btn" onclick="signOut('${activeSession.id}', '${activeSession.signed_in_at}')">Sign out</button>
+      <p class="msg">Not you? Ask them to scan and sign out, or contact staff.</p>
+      <div class="success-flash" id="flash"></div>`;
+  } else {
+    el.innerHTML = `
+      <div class="form-row"><label>Your name</label><input type="text" id="f-name" placeholder="e.g. Alex Kim" autocomplete="name"></div>
+      <div class="form-row"><label>Student / Staff ID</label><input type="text" id="f-id" placeholder="e.g. 1234567"></div>
+      <button class="btn btn-signin" id="action-btn" onclick="signIn()">Sign in to machine</button>
+      <div class="success-flash" id="flash"></div>`;
+  }
+}
+
+async function signIn() {
+  const name = document.getElementById('f-name').value.trim();
+  const sid = document.getElementById('f-id').value.trim();
+  if (!name || !sid) { alert('Please enter your name and ID.'); return; }
+  const btn = document.getElementById('action-btn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  const { error } = await db.from('sessions').insert([{ equip_id: machineId, name, student_id: sid }]);
+  if (error) { alert('Error: ' + error.message); btn.disabled = false; btn.textContent = 'Sign in to machine'; return; }
+  showFlash('Signed in! You can close this page.');
+  setTimeout(init, 1500);
+}
+
+async function signOut(id, signedInAt) {
+  const btn = document.getElementById('action-btn');
+  btn.disabled = true; btn.textContent = 'Signing out…';
+  const duration = Math.round((Date.now() - new Date(signedInAt)) / 60000);
+  const { error } = await db.from('sessions').update({ signed_out_at: new Date().toISOString(), duration_minutes: duration }).eq('id', id);
+  if (error) { alert('Error: ' + error.message); btn.disabled = false; btn.textContent = 'Sign out'; return; }
+  showFlash('Signed out. Session was ' + duration + ' min. Thanks!');
+  setTimeout(init, 1500);
+}
+
+function showFlash(msg) {
+  const f = document.getElementById('flash');
+  f.textContent = msg; f.style.display = 'block';
+}
+</script>
+</body>
+</html>
