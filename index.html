@@ -243,13 +243,9 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 </div>
 
 <script>
-// ════════════════════════════════════════════
-//  CONFIGURATION — fill in these three lines
-// ════════════════════════════════════════════
 const SUPABASE_URL  = 'https://jhbednwfcgrhusagyuhn.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_b8sY-aUx8FzIGUuxVuOnOQ_EW-C2t1P';
-const ADMIN_PIN     = '1234';  // change this to your own PIN
-// ════════════════════════════════════════════
+const ADMIN_PIN     = '1234';
 
 const EQUIPMENT = [
   { id: 'e1', name: 'Fast Scanning Calorimeter', category: 'Characterization' },
@@ -266,78 +262,26 @@ const EQUIPMENT = [
   { id: 'e12', name: 'Carver Press', category: 'Processing' },
   { id: 'e13', name: 'Batch Foaming Station', category: 'Processing' },
 ];
-// Initialize variables
-let db = null, allBookings = [], selectedEquip = null, weekOffset = 0, adminFilter = 'all', adminUnlocked = false, modalSlot = null;
-let allSessions = [];
 
-// Connect directly to Supabase
+let db = null, allBookings = [], allSessions = [];
+let selectedEquip = null, weekOffset = 0, adminFilter = 'all', adminUnlocked = false, modalSlot = null;
+
 db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 initSupabase();
-
-
-async function fetchSessions() {
-  const { data } = await db.from('sessions').select('*').order('signed_in_at', { ascending: false }).limit(100);
-  if (data) { allSessions = data; if (document.getElementById('page-usage').classList.contains('active')) renderUsage(); }
-}
-
-function renderUsage() {
-  const active = allSessions.filter(s => !s.signed_out_at);
-  const past = allSessions.filter(s => s.signed_out_at).slice(0, 30);
-  const activeEl = document.getElementById('active-sessions');
-  const pastEl = document.getElementById('past-sessions');
-
-  activeEl.innerHTML = active.length === 0 ? '<div class="empty-state">No one currently signed in.</div>' :
-    active.map(s => {
-      const eq = EQUIPMENT.find(e => e.id === s.equip_id);
-      const mins = Math.round((Date.now() - new Date(s.signed_in_at)) / 60000);
-      const dur = mins < 60 ? mins + ' min' : Math.floor(mins/60) + 'h ' + (mins%60) + 'm';
-      return `<div class="request-card">
-        <div class="req-status-bar" style="background:var(--green)"></div>
-        <div class="req-body">
-          <div class="req-top"><div><div class="req-name">${s.name}</div><div class="req-equip">${eq ? eq.name : s.equip_id} · ID ${s.student_id}</div></div>
-          <span class="badge badge-approved">Active · ${dur}</span></div>
-          <div class="req-meta"><span>⏱ Signed in ${new Date(s.signed_in_at).toLocaleTimeString()}</span></div>
-        </div></div>`;
-    }).join('');
-
-  pastEl.innerHTML = past.length === 0 ? '<div class="empty-state">No past sessions yet.</div>' :
-    past.map(s => {
-      const eq = EQUIPMENT.find(e => e.id === s.equip_id);
-      return `<div class="request-card">
-        <div class="req-status-bar" style="background:var(--hint)"></div>
-        <div class="req-body">
-          <div class="req-top"><div><div class="req-name">${s.name}</div><div class="req-equip">${eq ? eq.name : s.equip_id} · ID ${s.student_id}</div></div>
-          <span class="badge" style="background:var(--bg3);color:var(--muted)">${s.duration_minutes ?? '?'} min</span></div>
-          <div class="req-meta"><span>📅 ${s.signed_in_at.split('T')[0]}</span><span>🕐 ${new Date(s.signed_in_at).toLocaleTimeString()} → ${new Date(s.signed_out_at).toLocaleTimeString()}</span></div>
-        </div></div>`;
-    }).join('');
-}
-
-function exportSessionsCSV() {
-  if (!allSessions.length) { alert('No sessions to export.'); return; }
-  const hdrs = ['Name','Student ID','Equipment','Sign In','Sign Out','Duration (min)'];
-  const rows = allSessions.map(s => {
-    const eq = EQUIPMENT.find(e => e.id === s.equip_id);
-    const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
-    return [esc(s.name), esc(s.student_id), esc(eq ? eq.name : s.equip_id), esc(s.signed_in_at), esc(s.signed_out_at ?? 'Active'), esc(s.duration_minutes ?? '')].join(',');
-  });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([[hdrs.join(','), ...rows].join('\n')], {type:'text/csv'}));
-  a.download = 'lab-sessions-' + new Date().toISOString().split('T')[0] + '.csv';
-  a.click();
-}
 
 async function initSupabase() {
   setSyncStatus(false, 'Connecting…');
   await fetchBookings();
+  try { await fetchSessions(); } catch(e) { console.warn('Sessions table not ready:', e); }
   setSyncStatus(true, 'Live');
   db.channel('bookings-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchBookings)
     .subscribe();
-  await fetchSessions();
-  db.channel('sessions-live')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, fetchSessions)
-  .subscribe();
+  try {
+    db.channel('sessions-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, fetchSessions)
+      .subscribe();
+  } catch(e) {}
 }
 
 async function fetchBookings() {
@@ -351,6 +295,14 @@ async function fetchBookings() {
   }
 }
 
+async function fetchSessions() {
+  const { data } = await db.from('sessions').select('*').order('signed_in_at', { ascending: false }).limit(100);
+  if (data) {
+    allSessions = data;
+    if (document.getElementById('page-usage').classList.contains('active')) renderUsage();
+  }
+}
+
 function setSyncStatus(live, label) {
   document.getElementById('sync-dot').className = 'sync-dot' + (live ? ' live' : '');
   document.getElementById('sync-label').textContent = label;
@@ -360,9 +312,14 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  document.querySelectorAll('.nav-tab').forEach(t => { if (t.textContent.toLowerCase().includes(name === 'admin' ? 'admin' : name === 'book' ? 'book' : 'schedule')) t.classList.add('active'); });
+  // Fix: match tab by page name directly
+  const tabMap = { schedule: 'schedule', book: 'book equipment', admin: 'admin', usage: 'lab usage' };
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    if (t.textContent.trim().toLowerCase().startsWith(tabMap[name])) t.classList.add('active');
+  });
   if (name === 'admin') renderAdmin();
   if (name === 'schedule') renderEquipGrid();
+  if (name === 'usage') renderUsage();
 }
 
 function updatePendingBadge() {
@@ -470,10 +427,8 @@ async function submitBooking() {
   if (!name||!sid||!email||!date||!start||!purpose) { alert('Please fill in all fields.'); return; }
   const btn=document.getElementById('submit-btn');
   btn.disabled=true; btn.textContent='Submitting…';
-
   const { error } = await db.from('bookings').insert([{ name, student_id:sid, email, equip_id:equipId, date, start_time:start, duration, purpose, status:'pending' }]);
   if (error) { alert('Submit error: '+error.message); btn.disabled=false; btn.textContent='Submit booking request'; return; }
-  
   btn.disabled=false; btn.textContent='Submit booking request';
   document.getElementById('form-success').style.display='block';
   ['f-name','f-id','f-email','f-purpose'].forEach(id=>document.getElementById(id).value='');
@@ -504,8 +459,38 @@ function renderAdmin() {
 }
 
 async function updateStatus(id, status) {
-
   await db.from('bookings').update({ status }).eq('id', id);
+}
+
+function renderUsage() {
+  const active = allSessions.filter(s => !s.signed_out_at);
+  const past = allSessions.filter(s => s.signed_out_at).slice(0, 30);
+  const activeEl = document.getElementById('active-sessions');
+  const pastEl = document.getElementById('past-sessions');
+  activeEl.innerHTML = active.length === 0 ? '<div class="empty-state">No one currently signed in.</div>' :
+    active.map(s => {
+      const eq = EQUIPMENT.find(e => e.id === s.equip_id);
+      const mins = Math.round((Date.now() - new Date(s.signed_in_at)) / 60000);
+      const dur = mins < 60 ? mins + ' min' : Math.floor(mins/60) + 'h ' + (mins%60) + 'm';
+      return `<div class="request-card">
+        <div class="req-status-bar" style="background:var(--green)"></div>
+        <div class="req-body">
+          <div class="req-top"><div><div class="req-name">${s.name}</div><div class="req-equip">${eq ? eq.name : s.equip_id} · ID ${s.student_id}</div></div>
+          <span class="badge badge-approved">Active · ${dur}</span></div>
+          <div class="req-meta"><span>⏱ Signed in ${new Date(s.signed_in_at).toLocaleTimeString()}</span></div>
+        </div></div>`;
+    }).join('');
+  pastEl.innerHTML = past.length === 0 ? '<div class="empty-state">No past sessions yet.</div>' :
+    past.map(s => {
+      const eq = EQUIPMENT.find(e => e.id === s.equip_id);
+      return `<div class="request-card">
+        <div class="req-status-bar" style="background:var(--hint)"></div>
+        <div class="req-body">
+          <div class="req-top"><div><div class="req-name">${s.name}</div><div class="req-equip">${eq ? eq.name : s.equip_id} · ID ${s.student_id}</div></div>
+          <span class="badge" style="background:var(--bg3);color:var(--muted)">${s.duration_minutes ?? '?'} min</span></div>
+          <div class="req-meta"><span>📅 ${s.signed_in_at.split('T')[0]}</span><span>🕐 ${new Date(s.signed_in_at).toLocaleTimeString()} → ${new Date(s.signed_out_at).toLocaleTimeString()}</span></div>
+        </div></div>`;
+    }).join('');
 }
 
 function exportCSV() {
@@ -521,6 +506,20 @@ function exportCSV() {
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([[hdrs.join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'}));
   a.download='lab-bookings-'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+}
+
+function exportSessionsCSV() {
+  if (!allSessions.length) { alert('No sessions to export.'); return; }
+  const hdrs = ['Name','Student ID','Equipment','Sign In','Sign Out','Duration (min)'];
+  const rows = allSessions.map(s => {
+    const eq = EQUIPMENT.find(e => e.id === s.equip_id);
+    const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+    return [esc(s.name), esc(s.student_id), esc(eq ? eq.name : s.equip_id), esc(s.signed_in_at), esc(s.signed_out_at ?? 'Active'), esc(s.duration_minutes ?? '')].join(',');
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([[hdrs.join(','), ...rows].join('\n')], {type:'text/csv'}));
+  a.download = 'lab-sessions-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
 }
 
 function openModal(ds,ts,eq) {
