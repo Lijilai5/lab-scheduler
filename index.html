@@ -526,7 +526,13 @@ let adminSubTab = 'bookings';
     }
   });
 
-  await fetchBookings();
+  try {
+    await fetchBookings();
+    setSyncStatus(true, 'Live');
+  } catch(e) {
+    setSyncStatus(false, 'Connection failed');
+    console.error('Supabase error:', e);
+  }
   try { await fetchSessions(); } catch(e) {}
   setSyncStatus(true, 'Live');
 
