@@ -624,16 +624,36 @@ async function doSignIn() {
 
   btn.disabled = true; btn.textContent = 'Signing in…';
 
-  const { error } = await db.auth.signInWithPassword({ email, password });
-  btn.disabled = false; btn.textContent = 'Sign in';
+  // Timeout safety — re-enable after 8s no matter what
+  const timeout = setTimeout(() => {
+    btn.disabled = false; btn.textContent = 'Sign in';
+    errEl.textContent = 'Request timed out. Check your connection and try again.';
+    errEl.classList.add('show');
+  }, 8000);
 
-  if (error) {
-    errEl.textContent = error.message === 'Email not confirmed'
-      ? 'Please confirm your email first. Check your inbox.'
-      : error.message;
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    clearTimeout(timeout);
+    btn.disabled = false; btn.textContent = 'Sign in';
+
+    if (error) {
+      errEl.textContent = error.message === 'Email not confirmed'
+        ? 'Please confirm your email first. Check your inbox.'
+        : error.message;
+      errEl.classList.add('show');
+      return;
+    }
+
+    // Manually load member in case onAuthStateChange is slow
+    if (data?.user) {
+      await loadCurrentMember(data.user);
+    }
+  } catch(e) {
+    clearTimeout(timeout);
+    btn.disabled = false; btn.textContent = 'Sign in';
+    errEl.textContent = 'Network error: ' + e.message;
     errEl.classList.add('show');
   }
-  // On success, onAuthStateChange fires and handles navigation
 }
 
 async function doRegister() {
