@@ -507,12 +507,11 @@ let adminSubTab = 'bookings';
   setSyncStatus(false, 'Connecting…');
 
   // Listen for auth state changes — this fires on page load if session exists
-  db.auth.onAuthStateChange(async (event, session) => {
+  db.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
       if (session) {
-        await loadCurrentMember(session.user);
+        loadCurrentMember(session.user); // no await, fire and forget
       } else {
-        // No session — show overlay so they can sign in or browse
         currentMember = null;
         updateNavMember();
         showAuthOverlay();
@@ -524,27 +523,29 @@ let adminSubTab = 'bookings';
       renderEquipGrid();
       showAuthOverlay();
     }
+    // return nothing — not async
   });
 
   try {
     await fetchBookings();
+    await fetchSessions();
     setSyncStatus(true, 'Live');
   } catch(e) {
     setSyncStatus(false, 'Connection failed');
-    console.error('Supabase error:', e);
+    console.error('Boot error:', e);
   }
   try { await fetchSessions(); } catch(e) {}
   setSyncStatus(true, 'Live');
 
   db.channel('bookings-live')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchBookings)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' },
+      () => { fetchBookings(); })  // fire-and-forget wrapper
     .subscribe();
 
-  try {
-    db.channel('sessions-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, fetchSessions)
-      .subscribe();
-  } catch(e) {}
+  db.channel('sessions-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' },
+      () => { fetchSessions(); })
+    .subscribe();
 
   renderEquipGrid();
   document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
@@ -1138,8 +1139,28 @@ function toggleCal(e) {
   calViewYear = days[0].getFullYear(); calViewMonth = days[0].getMonth();
   renderCalDays(days); dd.classList.add('open');
 }
+
 function closeCal() { document.getElementById('cal-dropdown').classList.remove('open'); }
-document.addEventListener('click', e => { if (!document.getElementById('cal-picker-wrap').contains(e.target)) closeCal(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    fetchBookings().then(() => setSyncStatus(true, 'Live'))
+      .catch(() => setSyncStatus(false, 'Reconnecting…'));
+    fetchSessions().catch(() => {});
+  }
+});
+
+function ensureRealtimeConnected() {
+  const state = db.channel('bookings-live').state;
+  if (state === 'closed' || state === 'errored') {
+    db.channel('bookings-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' },
+        () => { fetchBookings(); })
+      .subscribe();
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') ensureRealtimeConnected();
+});
 
 function calMonthStep(dir) {
   calViewMonth += dir;
