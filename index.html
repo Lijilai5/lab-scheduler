@@ -198,6 +198,12 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 .perm-check input { width: 14px; height: 14px; cursor: pointer; accent-color: var(--text); }
 .perm-check.checked { border-color: var(--green); background: var(--green-bg); color: var(--green); font-weight: 500; }
 
+/* Cancel booking button */
+.btn-cancel-booking { font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(154,32,32,0.25); background: transparent; color: var(--red); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.12s; }
+.btn-cancel-booking:hover { background: var(--red-bg); }
+.my-bookings-section { margin-top: 32px; max-width: 560px; }
+.my-bookings-section h2 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 600; margin-bottom: 12px; letter-spacing: -0.3px; }
+
 /* Pending registrations table */
 .reg-table { width: 100%; border-collapse: collapse; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 .reg-table th { background: var(--bg3); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 14px; text-align: left; }
@@ -358,6 +364,10 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <div class="form-row"><label>Purpose / project</label><textarea id="f-purpose" placeholder="Briefly describe what you'll be using the equipment for…"></textarea></div>
     <button class="btn-submit" id="submit-btn" onclick="submitBooking()">Submit booking request</button>
     <div class="form-success" id="form-success">Your request has been submitted and is pending staff approval.</div>
+  </div>
+  <div class="my-bookings-section" id="my-bookings-section" style="display:none">
+    <h2>My bookings</h2>
+    <div class="request-list" id="my-bookings-list"><div class="empty-state">No bookings yet.</div></div>
   </div>
 </div>
 
@@ -727,6 +737,8 @@ function renderBookPage() {
     document.getElementById('f-name').value  = currentMember.name;
     document.getElementById('f-email').value = currentMember.email;
     populateEquipSelect();
+    document.getElementById('my-bookings-section').style.display = 'block';
+    renderMyBookings();
   }
 }
 
@@ -755,6 +767,7 @@ async function fetchBookings() {
     if (selectedEquip) renderWeekGrid();
     updatePendingBadge();
     if (document.getElementById('page-admin').classList.contains('active') && adminSubTab === 'bookings') renderAdmin();
+    if (document.getElementById('page-book').classList.contains('active')) renderMyBookings();
   }
 }
 
@@ -1244,6 +1257,52 @@ async function submitSlotBooking() {
   setTimeout(() => closeSlotModal(), 2200);
 }
 
+// ── My Bookings ────────────────────────────────────────────────────
+function renderMyBookings() {
+  if (!currentMember) return;
+  const myBookings = allBookings.filter(b => b.email === currentMember.email)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 20);
+  const list = document.getElementById('my-bookings-list');
+  if (!list) return;
+  if (myBookings.length === 0) {
+    list.innerHTML = '<div class="empty-state">You have no bookings yet.</div>'; return;
+  }
+  list.innerHTML = myBookings.map(b => {
+    const eq = EQUIPMENT.find(e => e.id === b.equip_id);
+    const [h, m] = b.start_time.split(':').map(Number), tot = h * 60 + m + b.duration;
+    const et = String(Math.floor(tot / 60)).padStart(2, '0') + ':' + String(tot % 60).padStart(2, '0');
+    const canCancel = b.status === 'pending' || b.status === 'approved';
+    return `<div class="request-card">
+      <div class="req-status-bar bar-${b.status}"></div>
+      <div class="req-body">
+        <div class="req-top">
+          <div><div class="req-name">${eq ? eq.name : b.equip_id}</div><div class="req-equip">${b.date} · ${b.start_time}–${et}</div></div>
+          <span class="badge badge-${b.status}">${b.status.charAt(0).toUpperCase() + b.status.slice(1)}</span>
+        </div>
+        <div class="req-purpose" style="margin-top:8px">${b.purpose}</div>
+        <div class="req-actions">${canCancel
+          ? `<button class="btn-cancel-booking" onclick="cancelBooking('${b.id}')">Cancel booking</button>`
+          : ''
+        }</div>
+      </div></div>`;
+  }).join('');
+}
+
+async function cancelBooking(id) {
+  if (!currentMember) return;
+  // Verify the booking actually belongs to the current user before deleting
+  const booking = allBookings.find(b => b.id === id);
+  if (!booking || booking.email !== currentMember.email) {
+    alert('You can only cancel your own bookings.'); return;
+  }
+  if (!confirm('Cancel this booking? This cannot be undone.')) return;
+  const { error } = await db.from('bookings').delete().eq('id', id).eq('email', currentMember.email);
+  if (error) { alert('Error cancelling booking: ' + error.message); return; }
+  await fetchBookings();
+  renderMyBookings();
+}
+
 // ── Book form page ─────────────────────────────────────────────────
 function populateEquipSelect() {
   const permitted = currentMember && currentMember.status === 'approved'
@@ -1275,6 +1334,7 @@ async function submitBooking() {
   if (error) { alert('Submit error: ' + error.message); return; }
   document.getElementById('form-success').style.display = 'block';
   document.getElementById('f-purpose').value = '';
+  renderMyBookings();
   setTimeout(() => document.getElementById('form-success').style.display = 'none', 5000);
 }
 
