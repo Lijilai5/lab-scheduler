@@ -374,7 +374,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
       <label>Duration</label>
       <div style="display:flex;align-items:center;gap:10px">
         <div style="display:flex;align-items:center;gap:6px;flex:1">
-          <input type="number" id="f-dur-hours" min="0" max="12" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('f')">
+          <input type="number" id="f-dur-hours" min="0" max="36" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('f')">
           <span style="font-size:13px;color:var(--muted);white-space:nowrap">hr</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex:1">
@@ -465,7 +465,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
       <label>Duration</label>
       <div style="display:flex;align-items:center;gap:10px">
         <div style="display:flex;align-items:center;gap:6px;flex:1">
-          <input type="number" id="sm-dur-hours" min="0" max="12" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('sm')">
+          <input type="number" id="sm-dur-hours" min="0" max="36" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('sm')">
           <span style="font-size:13px;color:var(--muted);white-space:nowrap">hr</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex:1">
@@ -1190,15 +1190,27 @@ function renderWeekGrid() {
 
       if (ov) {
         const bs = new Date(ov.date + 'T' + ov.start_time);
-        if (Math.abs(bs - cs) < 30 * 60000 && bs >= cs) {
-          const slots = Math.ceil(ov.duration / 30), blk = document.createElement('div');
-          blk.className = 'booking-block ' + (ov.status === 'approved' ? 'block-approved' : 'block-pending');
-          blk.style.height = (slots * 36 - 4) + 'px'; blk.style.top = '2px';
-          blk.textContent = ov.name;
-          blk.title = `${ov.name} · ${ov.start_time} · ${ov.duration}min · ${ov.status}`;
-          blk.style.cursor = 'pointer';
-          blk.onclick = (e) => { e.stopPropagation(); openBookingDetail(ov); };
-          cell.appendChild(blk);
+        const be = new Date(bs.getTime() + ov.duration * 60000);
+        // Render block segment: show at first slot this booking touches in this day column
+        if (bs <= cs && be > cs) {
+          const prevSlotTime = new Date(cs.getTime() - 30 * 60000);
+          const isFirstSlotInCol = bs > prevSlotTime || slot === 0;
+          if (isFirstSlotInCol) {
+            const dayEndMs = new Date(ds + 'T00:00:00').getTime() + 24 * 3600 * 1000;
+            const segEndMs = Math.min(be.getTime(), dayEndMs);
+            const colSlots = Math.ceil((segEndMs - cs.getTime()) / (30 * 60000));
+            const blk = document.createElement('div');
+            blk.className = 'booking-block ' + (ov.status === 'approved' ? 'block-approved' : 'block-pending');
+            blk.style.height = (Math.max(colSlots, 1) * 36 - 4) + 'px';
+            blk.style.top = '2px';
+            const continuesNext = be.getTime() > dayEndMs;
+            const continuedFrom = bs < cs;
+            blk.textContent = ov.name + (continuesNext ? ' →' : '') + (continuedFrom ? ' (cont.)' : '');
+            blk.title = `${ov.name} · ${ov.date} ${ov.start_time} · ${ov.duration}min · ${ov.status}`;
+            blk.style.cursor = 'pointer';
+            blk.onclick = (e) => { e.stopPropagation(); openBookingDetail(ov); };
+            cell.appendChild(blk);
+          }
         }
         cell.style.cursor = 'default';
       } else if (hasAccess) {
@@ -1405,6 +1417,7 @@ async function submitSlotBooking() {
   const purpose  = document.getElementById('sm-purpose').value.trim();
   const duration = parseInt(document.getElementById('sm-duration').value);
   if (!purpose) { alert('Please enter a purpose.'); return; }
+  if (duration > MAX_BOOKING_MINS) { alert('Maximum booking duration is 36 hours.'); return; }
 
   const btn = document.getElementById('sm-submit');
   btn.disabled = true; btn.textContent = 'Checking availability…';
@@ -1538,16 +1551,23 @@ async function cancelBooking(id) {
 }
 
 // ── Duration sync helper ───────────────────────────────────────────
+const MAX_BOOKING_MINS = 2160; // 36 hours
 function syncDuration(prefix) {
   const hours = parseInt(document.getElementById(prefix + '-dur-hours').value) || 0;
   const mins  = parseInt(document.getElementById(prefix + '-dur-mins').value)  || 0;
-  const total = hours * 60 + mins;
+  let total = hours * 60 + mins;
+  if (total > MAX_BOOKING_MINS) {
+    total = MAX_BOOKING_MINS;
+    document.getElementById(prefix + '-dur-hours').value = 36;
+    document.getElementById(prefix + '-dur-mins').value  = 0;
+  }
   document.getElementById(prefix + '-duration').value = total < 15 ? 15 : total;
   // Update label
   const label = document.getElementById(prefix + '-dur-label');
   if (total <= 0) { label.textContent = '—'; return; }
   const h = Math.floor(total / 60), m = total % 60;
-  label.textContent = '= ' + (h > 0 ? h + (m > 0 ? '.5' : '') + ' hr' + (h !== 1 && m === 0 ? 's' : '') : '') + (h === 0 ? m + ' min' : '');
+  const capped = total === MAX_BOOKING_MINS ? ' (max)' : '';
+  label.textContent = '= ' + (h > 0 ? h + (m > 0 ? '.5' : '') + ' hr' + (h !== 1 && m === 0 ? 's' : '') : '') + (h === 0 ? m + ' min' : '') + capped;
 }
 
 // ── Book form page ─────────────────────────────────────────────────
@@ -1570,6 +1590,7 @@ async function submitBooking() {
   const purpose  = document.getElementById('f-purpose').value.trim();
   if (!equipId || !date || !start || !purpose) { alert('Please fill in all fields.'); return; }
   if (!currentMember.permissions.has(equipId)) { alert('You don\'t have permission to book this equipment.'); return; }
+  if (duration > MAX_BOOKING_MINS) { alert('Maximum booking duration is 36 hours.'); return; }
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Submitting…';
