@@ -351,15 +351,20 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     </div>
     <div class="form-row">
       <label>Duration</label>
-      <select id="f-duration">
-        <option value="30">30 minutes</option>
-        <option value="60" selected>1 hour</option>
-        <option value="90">1.5 hours</option>
-        <option value="120">2 hours</option>
-        <option value="180">3 hours</option>
-        <option value="240">4 hours</option>
-        <option value="480">Half day (8h)</option>
-      </select>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:6px;flex:1">
+          <input type="number" id="f-dur-hours" min="0" max="12" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('f')">
+          <span style="font-size:13px;color:var(--muted);white-space:nowrap">hr</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex:1">
+          <select id="f-dur-mins" style="width:90px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" onchange="syncDuration('f')">
+            <option value="0">0 min</option>
+            <option value="30">30 min</option>
+          </select>
+        </div>
+        <span id="f-dur-label" style="font-size:12px;color:var(--muted);white-space:nowrap;min-width:60px">= 1 hr</span>
+      </div>
+      <input type="hidden" id="f-duration" value="60">
     </div>
     <div class="form-row"><label>Purpose / project</label><textarea id="f-purpose" placeholder="Briefly describe what you'll be using the equipment for…"></textarea></div>
     <button class="btn-submit" id="submit-btn" onclick="submitBooking()">Submit booking request</button>
@@ -437,14 +442,20 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <div class="form-row"><label>Your name</label><input type="text" id="sm-name" readonly></div>
     <div class="form-row">
       <label>Duration</label>
-      <select id="sm-duration">
-        <option value="30">30 minutes</option>
-        <option value="60" selected>1 hour</option>
-        <option value="90">1.5 hours</option>
-        <option value="120">2 hours</option>
-        <option value="180">3 hours</option>
-        <option value="240">4 hours</option>
-      </select>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:6px;flex:1">
+          <input type="number" id="sm-dur-hours" min="0" max="12" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('sm')">
+          <span style="font-size:13px;color:var(--muted);white-space:nowrap">hr</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex:1">
+          <select id="sm-dur-mins" style="width:90px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" onchange="syncDuration('sm')">
+            <option value="0">0 min</option>
+            <option value="30">30 min</option>
+          </select>
+        </div>
+        <span id="sm-dur-label" style="font-size:12px;color:var(--muted);white-space:nowrap;min-width:60px">= 1 hr</span>
+      </div>
+      <input type="hidden" id="sm-duration" value="60">
     </div>
     <div class="form-row"><label>Purpose / project</label><textarea id="sm-purpose" placeholder="Briefly describe what you'll be using the equipment for…" style="min-height:70px"></textarea></div>
     <div class="modal-actions">
@@ -860,7 +871,9 @@ function renderAdmin() {
         <div class="req-meta"><span>📅 ${b.date}</span><span>🕐 ${b.start_time} – ${et}</span><span>⏱ ${b.duration} min</span>${b.email ? `<span>✉️ ${b.email}</span>` : ''}</div>
         <div class="req-purpose">${b.purpose}</div>
         <div class="req-actions">${b.status === 'pending'
-          ? `<button class="btn-approve" onclick="updateStatus('${b.id}','approved')">Approve</button><button class="btn-reject" onclick="updateStatus('${b.id}','rejected')">Decline</button>`
+          ? `<button class="btn-approve" onclick="updateStatus('${b.id}','approved')">Approve</button><button class="btn-reject" onclick="updateStatus('${b.id}','rejected')">Decline</button><button class="btn-cancel-booking" style="margin-left:4px" onclick="adminCancelBooking('${b.id}','${b.name.replace(/'/g,"\\'")}')">Cancel</button>`
+          : b.status === 'approved'
+          ? `<button class="btn-small" onclick="updateStatus('${b.id}','pending')">Reset to pending</button><button class="btn-cancel-booking" style="margin-left:4px" onclick="adminCancelBooking('${b.id}','${b.name.replace(/'/g,"\\'")}')">Cancel</button>`
           : `<button class="btn-small" onclick="updateStatus('${b.id}','pending')">Reset to pending</button>`
         }</div>
       </div></div>`;
@@ -869,6 +882,13 @@ function renderAdmin() {
 
 async function updateStatus(id, status) {
   await db.from('bookings').update({ status }).eq('id', id);
+}
+
+async function adminCancelBooking(id, name) {
+  if (!confirm(`Cancel booking for "${name}"? This cannot be undone.`)) return;
+  const { error } = await db.from('bookings').delete().eq('id', id);
+  if (error) { alert('Error cancelling booking: ' + error.message); return; }
+  await fetchBookings();
 }
 
 // ── Registrations admin ────────────────────────────────────────────
@@ -1301,6 +1321,19 @@ async function cancelBooking(id) {
   if (error) { alert('Error cancelling booking: ' + error.message); return; }
   await fetchBookings();
   renderMyBookings();
+}
+
+// ── Duration sync helper ───────────────────────────────────────────
+function syncDuration(prefix) {
+  const hours = parseInt(document.getElementById(prefix + '-dur-hours').value) || 0;
+  const mins  = parseInt(document.getElementById(prefix + '-dur-mins').value)  || 0;
+  const total = hours * 60 + mins;
+  document.getElementById(prefix + '-duration').value = total < 15 ? 15 : total;
+  // Update label
+  const label = document.getElementById(prefix + '-dur-label');
+  if (total <= 0) { label.textContent = '—'; return; }
+  const h = Math.floor(total / 60), m = total % 60;
+  label.textContent = '= ' + (h > 0 ? h + (m > 0 ? '.5' : '') + ' hr' + (h !== 1 && m === 0 ? 's' : '') : '') + (h === 0 ? m + ' min' : '');
 }
 
 // ── Book form page ─────────────────────────────────────────────────
