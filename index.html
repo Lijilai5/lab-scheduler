@@ -466,6 +466,28 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   </div>
 </div>
 
+<!-- Booking detail popover (schedule page) -->
+<div class="modal-overlay" id="booking-detail-modal">
+  <div class="modal" style="max-width:380px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">
+      <h3 id="bd-title" style="font-size:16px"></h3>
+      <span id="bd-badge" class="badge"></span>
+    </div>
+    <p class="modal-sub" id="bd-sub" style="margin-bottom:16px"></p>
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--muted);margin-bottom:20px">
+      <div><span style="display:inline-block;width:18px">📅</span> <span id="bd-date"></span></div>
+      <div><span style="display:inline-block;width:18px">🕐</span> <span id="bd-time"></span></div>
+      <div><span style="display:inline-block;width:18px">⏱</span> <span id="bd-duration"></span></div>
+      <div id="bd-purpose-row"><span style="display:inline-block;width:18px">📝</span> <span id="bd-purpose"></span></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeBookingDetail()">Close</button>
+      <button id="bd-cancel-btn" class="btn-confirm" style="background:var(--red-bg);color:var(--red);border:1px solid rgba(154,32,32,0.2)" onclick="cancelBookingFromDetail()">Cancel booking</button>
+    </div>
+    <div class="modal-error" id="bd-error" style="margin-top:10px"></div>
+  </div>
+</div>
+
 <!-- Member edit modal (admin only) -->
 <div class="modal-overlay" id="member-modal">
   <div class="modal">
@@ -871,9 +893,7 @@ function renderAdmin() {
         <div class="req-meta"><span>📅 ${b.date}</span><span>🕐 ${b.start_time} – ${et}</span><span>⏱ ${b.duration} min</span>${b.email ? `<span>✉️ ${b.email}</span>` : ''}</div>
         <div class="req-purpose">${b.purpose}</div>
         <div class="req-actions">${b.status === 'pending'
-          ? `<button class="btn-approve" onclick="updateStatus('${b.id}','approved')">Approve</button><button class="btn-reject" onclick="updateStatus('${b.id}','rejected')">Decline</button><button class="btn-cancel-booking" style="margin-left:4px" onclick="adminCancelBooking('${b.id}','${b.name.replace(/'/g,"\\'")}')">Cancel</button>`
-          : b.status === 'approved'
-          ? `<button class="btn-small" onclick="updateStatus('${b.id}','pending')">Reset to pending</button><button class="btn-cancel-booking" style="margin-left:4px" onclick="adminCancelBooking('${b.id}','${b.name.replace(/'/g,"\\'")}')">Cancel</button>`
+          ? `<button class="btn-approve" onclick="updateStatus('${b.id}','approved')">Approve</button><button class="btn-reject" onclick="updateStatus('${b.id}','rejected')">Decline</button>`
           : `<button class="btn-small" onclick="updateStatus('${b.id}','pending')">Reset to pending</button>`
         }</div>
       </div></div>`;
@@ -1145,6 +1165,8 @@ function renderWeekGrid() {
           blk.style.height = (slots * 36 - 4) + 'px'; blk.style.top = '2px';
           blk.textContent = ov.name;
           blk.title = `${ov.name} · ${ov.start_time} · ${ov.duration}min · ${ov.status}`;
+          blk.style.cursor = 'pointer';
+          blk.onclick = (e) => { e.stopPropagation(); openBookingDetail(ov); };
           cell.appendChild(blk);
         }
         cell.style.cursor = 'default';
@@ -1275,6 +1297,60 @@ async function submitSlotBooking() {
   document.getElementById('slot-success').style.display = 'block';
   btn.textContent = 'Submitted ✓';
   setTimeout(() => closeSlotModal(), 2200);
+}
+
+let detailBookingId = null;
+
+function openBookingDetail(b) {
+  detailBookingId = b.id;
+  const eq = EQUIPMENT.find(e => e.id === b.equip_id);
+  const [h, m] = b.start_time.split(':').map(Number), tot = h * 60 + m + b.duration;
+  const et = String(Math.floor(tot / 60)).padStart(2,'0') + ':' + String(tot % 60).padStart(2,'0');
+  const durH = Math.floor(b.duration / 60), durM = b.duration % 60;
+  const durStr = durH > 0 ? durH + 'h' + (durM > 0 ? ' ' + durM + 'm' : '') : durM + ' min';
+
+  document.getElementById('bd-title').textContent = b.name;
+  document.getElementById('bd-sub').textContent   = eq ? eq.name : b.equip_id;
+  document.getElementById('bd-badge').textContent = b.status.charAt(0).toUpperCase() + b.status.slice(1);
+  document.getElementById('bd-badge').className   = 'badge badge-' + b.status;
+  document.getElementById('bd-date').textContent  = b.date;
+  document.getElementById('bd-time').textContent  = b.start_time + ' – ' + et;
+  document.getElementById('bd-duration').textContent = durStr;
+  document.getElementById('bd-purpose').textContent  = b.purpose || '—';
+  document.getElementById('bd-error').style.display  = 'none';
+
+  // Show cancel button only if this booking belongs to the current user
+  const isOwner = currentMember && b.email === currentMember.email;
+  const canCancel = isOwner && (b.status === 'pending' || b.status === 'approved');
+  document.getElementById('bd-cancel-btn').style.display = canCancel ? 'block' : 'none';
+
+  document.getElementById('booking-detail-modal').classList.add('open');
+}
+
+function closeBookingDetail() {
+  document.getElementById('booking-detail-modal').classList.remove('open');
+  detailBookingId = null;
+}
+
+async function cancelBookingFromDetail() {
+  if (!detailBookingId || !currentMember) return;
+  const booking = allBookings.find(b => b.id === detailBookingId);
+  if (!booking || booking.email !== currentMember.email) {
+    document.getElementById('bd-error').textContent = 'You can only cancel your own bookings.';
+    document.getElementById('bd-error').style.display = 'block'; return;
+  }
+  if (!confirm('Cancel this booking? This cannot be undone.')) return;
+  const btn = document.getElementById('bd-cancel-btn');
+  btn.disabled = true; btn.textContent = 'Cancelling…';
+  const { error } = await db.from('bookings').delete().eq('id', detailBookingId).eq('email', currentMember.email);
+  if (error) {
+    document.getElementById('bd-error').textContent = 'Error: ' + error.message;
+    document.getElementById('bd-error').style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Cancel booking'; return;
+  }
+  closeBookingDetail();
+  await fetchBookings();
+  renderMyBookings();
 }
 
 // ── My Bookings ────────────────────────────────────────────────────
