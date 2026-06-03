@@ -209,6 +209,23 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 .reg-table th { background: var(--bg3); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 14px; text-align: left; }
 .reg-table td { padding: 12px 14px; font-size: 13px; border-top: 1px solid var(--border); vertical-align: middle; }
 .reg-table tr:hover td { background: #fafaf7; }
+
+/* Drag-to-book */
+.sg-cell { user-select: none; }
+.sg-cell.drag-highlight { background: #dceef7 !important; }
+.sg-cell.drag-start     { background: #b8dcf0 !important; }
+.drag-preview {
+  position: absolute; left: 2px; right: 2px; border-radius: 4px;
+  background: rgba(26,122,200,0.18); border: 1.5px dashed #3a8fd6;
+  pointer-events: none; z-index: 5; display: flex; align-items: center;
+  justify-content: center; font-size: 10px; font-weight: 600;
+  color: #1a5fa0; padding: 2px 4px; white-space: nowrap; overflow: hidden;
+}
+.drag-hint {
+  font-size: 11px; color: var(--hint); margin-top: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.drag-hint svg { flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -328,6 +345,10 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <p style="font-size:11px;color:var(--hint);margin-top:10px;">
       <span style="display:inline-block;width:10px;height:10px;background:#e6f4ed;border-left:2px solid #1a7a4a;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Approved &nbsp;
       <span style="display:inline-block;width:10px;height:10px;background:#fdf3dc;border-left:2px solid #f0a500;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Pending
+    </p>
+    <p class="drag-hint" id="drag-hint" style="display:none">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v12M2 8h12" stroke-linecap="round"/></svg>
+      Click a cell to book instantly, or <strong>click &amp; drag</strong> down to set your duration in 30-min steps.
     </p>
   </div>
 </div>
@@ -1137,6 +1158,9 @@ function renderWeekGrid() {
     grid.appendChild(hdr);
   });
 
+  // Build cell map for drag: cellMap[slot][dayIndex] = cell element
+  const cellMap = [];
+
   for (let slot = 0; slot < 48; slot++) {
     const h = Math.floor(slot / 2), m = slot % 2 === 0 ? '00' : '30', isHour = slot % 2 === 0;
     const ts = `${String(h).padStart(2,'0')}:${m}`;
@@ -1146,7 +1170,8 @@ function renderWeekGrid() {
     timeCell.textContent = isHour ? ts : '';
     grid.appendChild(timeCell);
 
-    days.forEach(day => {
+    cellMap[slot] = [];
+    days.forEach((day, di) => {
       const ds = day.toISOString().split('T')[0];
       const cs = new Date(ds + 'T' + ts), ce = new Date(cs.getTime() + 30 * 60000);
       const ov = allBookings.find(b => {
@@ -1157,6 +1182,12 @@ function renderWeekGrid() {
       });
       const cell = document.createElement('div');
       cell.className = 'sg-cell' + (isHour ? ' hour-start' : '');
+      cell.dataset.slot = slot;
+      cell.dataset.di   = di;
+      cell.dataset.ds   = ds;
+      cell.dataset.ts   = ts;
+      cell.dataset.booked = ov ? '1' : '0';
+
       if (ov) {
         const bs = new Date(ov.date + 'T' + ov.start_time);
         if (Math.abs(bs - cs) < 30 * 60000 && bs >= cs) {
@@ -1171,8 +1202,7 @@ function renderWeekGrid() {
         }
         cell.style.cursor = 'default';
       } else if (hasAccess) {
-        cell.onclick = () => openSlotModal(ds, ts, eq);
-        cell.title   = 'Click to book ' + ts;
+        cell.title = 'Click or drag to book from ' + ts;
       } else if (!currentMember) {
         cell.onclick = () => showAuthOverlay();
         cell.title   = 'Sign in to book';
@@ -1180,9 +1210,117 @@ function renderWeekGrid() {
         cell.style.cursor = 'default';
         cell.title = currentMember.status !== 'approved' ? 'Pending approval' : 'No access to this equipment';
       }
+      cellMap[slot][di] = cell;
       grid.appendChild(cell);
     });
   }
+
+  // Show drag hint if user has access
+  const hintEl = document.getElementById('drag-hint');
+  if (hintEl) hintEl.style.display = hasAccess ? 'flex' : 'none';
+
+  // Drag-to-select logic (only for users with access)
+  if (hasAccess) {
+    initDragSelect(grid, cellMap, days, eq);
+  }
+}
+
+// ── Drag-to-select on schedule grid ───────────────────────────────
+let _drag = null; // active drag state
+
+function initDragSelect(grid, cellMap, days, eq) {
+  let dragPreview = null;
+
+  function clearHighlights() {
+    grid.querySelectorAll('.sg-cell.drag-highlight,.sg-cell.drag-start').forEach(c => {
+      c.classList.remove('drag-highlight','drag-start');
+    });
+    if (dragPreview) { dragPreview.remove(); dragPreview = null; }
+  }
+
+  function applyHighlights(startSlot, endSlot, di) {
+    clearHighlights();
+    const lo = Math.min(startSlot, endSlot), hi = Math.max(startSlot, endSlot);
+    for (let s = lo; s <= hi; s++) {
+      const c = cellMap[s] && cellMap[s][di];
+      if (!c || c.dataset.booked === '1') break;
+      c.classList.add(s === lo ? 'drag-start' : 'drag-highlight');
+    }
+    // Render floating preview label in the start cell
+    const startCell = cellMap[lo] && cellMap[lo][di];
+    if (startCell) {
+      const slots = hi - lo + 1;
+      const durMin = slots * 30;
+      const durLabel = durMin < 60 ? durMin + ' min' : (durMin / 60) + ' hr' + (durMin !== 60 ? 's' : '');
+      const preview = document.createElement('div');
+      preview.className = 'drag-preview';
+      preview.style.top    = '2px';
+      preview.style.height = (slots * 36 - 4) + 'px';
+      preview.textContent  = durLabel;
+      startCell.appendChild(preview);
+      dragPreview = preview;
+    }
+  }
+
+  // Attach mousedown on each free cell
+  for (let slot = 0; slot < 48; slot++) {
+    days.forEach((day, di) => {
+      const cell = cellMap[slot] && cellMap[slot][di];
+      if (!cell || cell.dataset.booked === '1') return;
+
+      cell.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        _drag = { startSlot: slot, curSlot: slot, di, ds: cell.dataset.ds, ts: cell.dataset.ts, eq, moved: false };
+        cell.classList.add('drag-start');
+      });
+
+      cell.addEventListener('mouseenter', () => {
+        if (!_drag || _drag.di !== di) return;
+        // Stop if we hit a booked cell
+        const blocked = isRangeBlocked(_drag.startSlot, slot, di, cellMap);
+        if (blocked) return;
+        _drag.curSlot = slot;
+        _drag.moved = true;
+        applyHighlights(_drag.startSlot, slot, di);
+      });
+    });
+  }
+
+  grid.addEventListener('mouseup', (e) => {
+    if (!_drag) return;
+    const { startSlot, curSlot, ds, ts, eq: dragEq } = _drag;
+    const slots = Math.max(curSlot, startSlot) - Math.min(curSlot, startSlot) + 1;
+    const durMin = slots * 30;
+    clearHighlights();
+    _drag = null;
+    openSlotModalWithDuration(ds, ts, dragEq, durMin);
+  });
+
+  // Cancel drag on mouseup anywhere
+  document.addEventListener('mouseup', () => {
+    if (_drag) { clearHighlights(); _drag = null; }
+  }, { once: false });
+}
+
+function isRangeBlocked(startSlot, endSlot, di, cellMap) {
+  const lo = Math.min(startSlot, endSlot), hi = Math.max(startSlot, endSlot);
+  for (let s = lo; s <= hi; s++) {
+    const c = cellMap[s] && cellMap[s][di];
+    if (!c || c.dataset.booked === '1') return true;
+  }
+  return false;
+}
+
+function openSlotModalWithDuration(ds, ts, eq, durMin) {
+  openSlotModal(ds, ts, eq);
+  // Pre-fill duration
+  const hours = Math.floor(durMin / 60), mins = durMin % 60;
+  const hoursEl = document.getElementById('sm-dur-hours');
+  const minsEl  = document.getElementById('sm-dur-mins');
+  if (hoursEl) hoursEl.value = hours;
+  if (minsEl)  minsEl.value  = mins;
+  syncDuration('sm');
 }
 
 // ── Calendar dropdown ──────────────────────────────────────────────
