@@ -374,7 +374,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
       <label>Duration</label>
       <div style="display:flex;align-items:center;gap:10px">
         <div style="display:flex;align-items:center;gap:6px;flex:1">
-          <input type="number" id="f-dur-hours" min="0" max="36" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('f')">
+          <input type="number" id="f-dur-hours" min="0" max="72" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('f')">
           <span style="font-size:13px;color:var(--muted);white-space:nowrap">hr</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex:1">
@@ -386,6 +386,11 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
         <span id="f-dur-label" style="font-size:12px;color:var(--muted);white-space:nowrap;min-width:60px">= 1 hr</span>
       </div>
       <input type="hidden" id="f-duration" value="60">
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button type="button" onclick="setDayDuration('f',1)" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--bg);color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg)'">1 day</button>
+        <button type="button" onclick="setDayDuration('f',2)" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--bg);color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg)'">2 days</button>
+        <button type="button" onclick="setDayDuration('f',3)" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--bg);color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg)'">3 days</button>
+      </div>
     </div>
     <div class="form-row"><label>Purpose / project</label><textarea id="f-purpose" placeholder="Briefly describe what you'll be using the equipment for…"></textarea></div>
     <button class="btn-submit" id="submit-btn" onclick="submitBooking()">Submit booking request</button>
@@ -465,7 +470,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
       <label>Duration</label>
       <div style="display:flex;align-items:center;gap:10px">
         <div style="display:flex;align-items:center;gap:6px;flex:1">
-          <input type="number" id="sm-dur-hours" min="0" max="36" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('sm')">
+          <input type="number" id="sm-dur-hours" min="0" max="72" value="1" style="width:70px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);outline:none;" oninput="syncDuration('sm')">
           <span style="font-size:13px;color:var(--muted);white-space:nowrap">hr</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex:1">
@@ -477,6 +482,11 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
         <span id="sm-dur-label" style="font-size:12px;color:var(--muted);white-space:nowrap;min-width:60px">= 1 hr</span>
       </div>
       <input type="hidden" id="sm-duration" value="60">
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button type="button" onclick="setDayDuration('sm',1)" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--bg);color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg)'">1 day</button>
+        <button type="button" onclick="setDayDuration('sm',2)" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--bg);color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg)'">2 days</button>
+        <button type="button" onclick="setDayDuration('sm',3)" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--bg);color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg)'">3 days</button>
+      </div>
     </div>
     <div class="form-row"><label>Purpose / project</label><textarea id="sm-purpose" placeholder="Briefly describe what you'll be using the equipment for…" style="min-height:70px"></textarea></div>
     <div class="modal-actions">
@@ -1417,7 +1427,7 @@ async function submitSlotBooking() {
   const purpose  = document.getElementById('sm-purpose').value.trim();
   const duration = parseInt(document.getElementById('sm-duration').value);
   if (!purpose) { alert('Please enter a purpose.'); return; }
-  if (duration > MAX_BOOKING_MINS) { alert('Maximum booking duration is 36 hours.'); return; }
+  if (duration > MAX_BOOKING_MINS) { alert('Maximum booking duration is 3 days (72 hours).'); return; }
 
   const btn = document.getElementById('sm-submit');
   btn.disabled = true; btn.textContent = 'Checking availability…';
@@ -1551,26 +1561,32 @@ async function cancelBooking(id) {
 }
 
 // ── Duration sync helper ───────────────────────────────────────────
-const MAX_BOOKING_MINS = 2160; // 36 hours
+const MAX_BOOKING_MINS = 4320; // 72 hours (3 days)
 function syncDuration(prefix) {
   const hours = parseInt(document.getElementById(prefix + '-dur-hours').value) || 0;
   const mins  = parseInt(document.getElementById(prefix + '-dur-mins').value)  || 0;
   let total = hours * 60 + mins;
   if (total > MAX_BOOKING_MINS) {
     total = MAX_BOOKING_MINS;
-    document.getElementById(prefix + '-dur-hours').value = 36;
+    document.getElementById(prefix + '-dur-hours').value = 72;
     document.getElementById(prefix + '-dur-mins').value  = 0;
   }
-  document.getElementById(prefix + '-duration').value = total < 15 ? 15 : total;
+  document.getElementById(prefix + '-duration').value = total < 30 ? 30 : total;
   // Update label
   const label = document.getElementById(prefix + '-dur-label');
-  if (total <= 0) { label.textContent = '—'; return; }
+  if (total <= 0) { label.textContent = '— (min 30 min)'; return; }
   const h = Math.floor(total / 60), m = total % 60;
-  const capped = total === MAX_BOOKING_MINS ? ' (max)' : '';
+  const capped = total === MAX_BOOKING_MINS ? ' (max)' : (total < 30 ? ' (min 30 min)' : '');
   label.textContent = '= ' + (h > 0 ? h + (m > 0 ? '.5' : '') + ' hr' + (h !== 1 && m === 0 ? 's' : '') : '') + (h === 0 ? m + ' min' : '') + capped;
 }
 
 // ── Book form page ─────────────────────────────────────────────────
+function setDayDuration(prefix, days) {
+  document.getElementById(prefix + '-dur-hours').value = days * 24;
+  document.getElementById(prefix + '-dur-mins').value  = 0;
+  syncDuration(prefix);
+}
+
 function populateEquipSelect() {
   const permitted = currentMember && currentMember.status === 'approved'
     ? EQUIPMENT.filter(e => currentMember.permissions.has(e.id))
@@ -1590,7 +1606,7 @@ async function submitBooking() {
   const purpose  = document.getElementById('f-purpose').value.trim();
   if (!equipId || !date || !start || !purpose) { alert('Please fill in all fields.'); return; }
   if (!currentMember.permissions.has(equipId)) { alert('You don\'t have permission to book this equipment.'); return; }
-  if (duration > MAX_BOOKING_MINS) { alert('Maximum booking duration is 36 hours.'); return; }
+  if (duration > MAX_BOOKING_MINS) { alert('Maximum booking duration is 3 days (72 hours).'); return; }
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Submitting…';
