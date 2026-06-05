@@ -1509,6 +1509,7 @@ async function cancelBookingFromDetail() {
     document.getElementById('bd-error').style.display = 'block';
     btn.disabled = false; btn.textContent = 'Cancel booking'; return;
   }
+  btn.disabled = false; btn.textContent = 'Cancel booking';
   closeBookingDetail();
   await fetchBookings();
   renderMyBookings();
