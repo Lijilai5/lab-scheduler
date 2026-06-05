@@ -1311,15 +1311,21 @@ function initDragSelect(grid, cellMap, days, eq) {
 
   grid.addEventListener('mouseup', (e) => {
     if (!_drag) return;
-    const { startSlot, curSlot, ds, ts, eq: dragEq } = _drag;
-    const slots = Math.max(curSlot, startSlot) - Math.min(curSlot, startSlot) + 1;
+    const { startSlot, curSlot, di, eq: dragEq } = _drag;
+    const lo = Math.min(startSlot, curSlot);
+    const hi = Math.max(startSlot, curSlot);
+    const slots = hi - lo + 1;
     const durMin = slots * 30;
+    const topCell = cellMap[lo] && cellMap[lo][di];
+    const ds = topCell ? topCell.dataset.ds : _drag.ds;
+    const ts = topCell ? topCell.dataset.ts : _drag.ts;
     clearHighlights();
     _drag = null;
+    e.stopPropagation();
     openSlotModalWithDuration(ds, ts, dragEq, durMin);
   });
 
-  // Cancel drag on mouseup anywhere
+  // Cancel drag on mouseup anywhere outside the grid
   document.addEventListener('mouseup', () => {
     if (_drag) { clearHighlights(); _drag = null; }
   }, { once: false });
@@ -1509,8 +1515,8 @@ async function cancelBookingFromDetail() {
     document.getElementById('bd-error').style.display = 'block';
     btn.disabled = false; btn.textContent = 'Cancel booking'; return;
   }
-  btn.disabled = false; btn.textContent = 'Cancel booking';
   closeBookingDetail();
+  btn.disabled = false; btn.textContent = 'Cancel booking';
   await fetchBookings();
   renderMyBookings();
 }
