@@ -61,6 +61,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 const params = new URLSearchParams(location.search);
 const machineId = params.get('machine');
 const eq = EQUIPMENT.find(e => e.id === machineId);
+let currentBooking = null;
 
 if (!eq) {
   document.getElementById('equip-name').textContent = 'Unknown machine';
@@ -75,7 +76,20 @@ if (!eq) {
 async function init() {
   const { data } = await db.from('sessions').select('*').eq('equip_id', machineId).is('signed_out_at', null).order('signed_in_at', { ascending: false }).limit(1);
   const active = data && data[0];
+
+  const { data: bookingData } = await db.from('bookings').select('*').eq('equip_id', machineId).eq('status', 'approved');
+  const now = new Date();
+  currentBooking = (bookingData || []).find(b => {
+    const start = new Date(b.date + 'T' + b.start_time);
+    const end = new Date(start.getTime() + b.duration * 60000);
+    return now >= start && now < end;
+  }) || null;
+
   renderUI(active);
+}
+
+function normalizeName(s) {
+  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 function timeSince(dateStr) {
@@ -97,11 +111,16 @@ function renderUI(activeSession) {
       <button class="btn btn-signout" id="action-btn" onclick="signOut('${activeSession.id}', '${activeSession.signed_in_at}')">Sign out</button>
       <p class="msg">Not you? Ask them to scan and sign out, or contact staff.</p>
       <div class="success-flash" id="flash"></div>`;
+  } else if (!currentBooking) {
+    el.innerHTML = `
+      <p class="msg" style="margin-top:0">No approved booking covers this machine right now.</p>
+      <p class="msg">You need an approved booking for this time slot to sign in. Please book this machine first, or contact staff if you believe this is an error.</p>`;
   } else {
     el.innerHTML = `
-      <div class="form-row"><label>Your name</label><input type="text" id="f-name" placeholder="e.g. Alex Kim" autocomplete="name"></div>
+      <div class="form-row"><label>Your name</label><input type="text" id="f-name" placeholder="Enter the name on your booking" autocomplete="name"></div>
       <div class="form-row"><label>Student / Staff ID</label><input type="text" id="f-id" placeholder="e.g. 1234567"></div>
       <button class="btn btn-signin" id="action-btn" onclick="signIn()">Sign in to machine</button>
+      <p class="msg" id="signin-error" style="color:var(--red);display:none"></p>
       <div class="success-flash" id="flash"></div>`;
   }
 }
@@ -109,7 +128,16 @@ function renderUI(activeSession) {
 async function signIn() {
   const name = document.getElementById('f-name').value.trim();
   const sid = document.getElementById('f-id').value.trim();
+  const errEl = document.getElementById('signin-error');
+  errEl.style.display = 'none';
   if (!name || !sid) { alert('Please enter your name and ID.'); return; }
+
+  if (!currentBooking || normalizeName(name) !== normalizeName(currentBooking.name)) {
+    errEl.textContent = "That name doesn't match the approved booking for this time slot. Enter the exact name used when booking, or contact the person who booked it.";
+    errEl.style.display = 'block';
+    return;
+  }
+
   const btn = document.getElementById('action-btn');
   btn.disabled = true; btn.textContent = 'Signing in…';
   const { error } = await db.from('sessions').insert([{ equip_id: machineId, name, student_id: sid }]);
