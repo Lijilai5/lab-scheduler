@@ -350,7 +350,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   <div class="form-card" id="book-form-card" style="display:none">
     <div class="form-row"><label>Your name</label><input type="text" id="f-name" readonly></div>
     <div class="form-row"><label>Email</label><input type="text" id="f-email" readonly></div>
-    <div class="form-row"><label>Equipment</label><select id="f-equip"></select></div>
+    <div class="form-row"><label>Equipment</label><select id="f-equip" onchange="syncDuration('f')"></select></div>
     <div class="form-cols">
       <div class="form-row"><label>Date</label><input type="date" id="f-date"></div>
       <div class="form-row"><label>Start time</label><input type="time" id="f-start"></div>
@@ -1424,7 +1424,8 @@ async function submitSlotBooking() {
   const purpose  = document.getElementById('sm-purpose').value.trim();
   const duration = parseInt(document.getElementById('sm-duration').value);
   if (!purpose) { alert('Please enter a purpose.'); return; }
-  if (duration > MAX_BOOKING_MINS) { alert('Maximum booking duration is 3 days (72 hours).'); return; }
+  const maxMins = getMaxBookingMins(modalSlot.eq.id);
+  if (duration > maxMins) { alert(maxMins === MAX_BOOKING_MINS ? 'Maximum booking duration is 3 days (72 hours).' : 'Maximum booking duration for this equipment is 4 hours.'); return; }
 
   const btn = document.getElementById('sm-submit');
   btn.disabled = true; btn.textContent = 'Checking availability…';
@@ -1557,21 +1558,36 @@ async function cancelBooking(id) {
 }
 
 // ── Duration sync helper ───────────────────────────────────────────
-const MAX_BOOKING_MINS = 4320; // 72 hours (3 days)
+const MAX_BOOKING_MINS = 4320; // 72 hours (3 days) — vacuum ovens only
+const DEFAULT_MAX_BOOKING_MINS = 240; // 4 hours — everything else
+const LONG_BOOKING_EQUIP_IDS = ['e8', 'e9', 'e10']; // Vacuum Oven #1-3
+
+function getMaxBookingMins(equipId) {
+  return LONG_BOOKING_EQUIP_IDS.includes(equipId) ? MAX_BOOKING_MINS : DEFAULT_MAX_BOOKING_MINS;
+}
+
+// Resolves the equipment id currently selected for a given form prefix,
+// so the duration cap can be looked up per-equipment.
+function equipIdForPrefix(prefix) {
+  if (prefix === 'sm') return modalSlot && modalSlot.eq ? modalSlot.eq.id : null;
+  return document.getElementById('f-equip').value;
+}
+
 function syncDuration(prefix) {
+  const maxMins = getMaxBookingMins(equipIdForPrefix(prefix));
   const hours = parseInt(document.getElementById(prefix + '-dur-hours').value) || 0;
   const mins  = parseInt(document.getElementById(prefix + '-dur-mins').value)  || 0;
   let total = hours * 60 + mins;
-  if (total > MAX_BOOKING_MINS) {
-    total = MAX_BOOKING_MINS;
-    document.getElementById(prefix + '-dur-hours').value = 72;
-    document.getElementById(prefix + '-dur-mins').value  = 0;
+  if (total > maxMins) {
+    total = maxMins;
+    document.getElementById(prefix + '-dur-hours').value = Math.floor(maxMins / 60);
+    document.getElementById(prefix + '-dur-mins').value  = maxMins % 60;
   }
   document.getElementById(prefix + '-duration').value = total < 30 ? 30 : total;
   const label = document.getElementById(prefix + '-dur-label');
   if (total <= 0) { label.textContent = '— (min 30 min)'; return; }
   const h = Math.floor(total / 60), m = total % 60;
-  const capped = total === MAX_BOOKING_MINS ? ' (max)' : (total < 30 ? ' (min 30 min)' : '');
+  const capped = total === maxMins ? ' (max)' : (total < 30 ? ' (min 30 min)' : '');
   label.textContent = '= ' + (h > 0 ? h + (m > 0 ? '.5' : '') + ' hr' + (h !== 1 && m === 0 ? 's' : '') : '') + (h === 0 ? m + ' min' : '') + capped;
 }
 
@@ -1601,7 +1617,8 @@ async function submitBooking() {
   const purpose  = document.getElementById('f-purpose').value.trim();
   if (!equipId || !date || !start || !purpose) { alert('Please fill in all fields.'); return; }
   if (!currentMember.permissions.has(equipId)) { alert('You don\'t have permission to book this equipment.'); return; }
-  if (duration > MAX_BOOKING_MINS) { alert('Maximum booking duration is 3 days (72 hours).'); return; }
+  const maxMins = getMaxBookingMins(equipId);
+  if (duration > maxMins) { alert(maxMins === MAX_BOOKING_MINS ? 'Maximum booking duration is 3 days (72 hours).' : 'Maximum booking duration for this equipment is 4 hours.'); return; }
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Submitting…';
