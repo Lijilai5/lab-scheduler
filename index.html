@@ -593,6 +593,9 @@ let _drag = null; // active drag state
   try { await fetchSessions(); } catch(e) {}
   setSyncStatus(true, 'Live');
 
+  try { await autoDeclineNoShows(); } catch(e) { console.error('Auto-decline check failed:', e); }
+  setInterval(() => { autoDeclineNoShows().catch(e => console.error('Auto-decline check failed:', e)); }, 60000);
+
   db.channel('bookings-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' },
       () => { fetchBookings(); })
@@ -819,6 +822,41 @@ async function fetchSessions() {
     allSessions = data;
     if (document.getElementById('page-usage').classList.contains('active')) renderUsage();
   }
+}
+
+// ── Auto-decline no-shows ────────────────────────────────────────────
+// If a booking's start time + grace period passes with no matching
+// sign-in session for that equipment, the booking is auto-declined,
+// even if it was already approved.
+const NO_SHOW_GRACE_MINS = 15;
+
+async function autoDeclineNoShows() {
+  const now = Date.now();
+  const { data: bookings } = await db.from('bookings').select('*').in('status', ['pending', 'approved']);
+  if (!bookings || !bookings.length) return;
+
+  const overdue = bookings.filter(b => {
+    const start = new Date(b.date + 'T' + b.start_time).getTime();
+    return now >= start + NO_SHOW_GRACE_MINS * 60000;
+  });
+  if (!overdue.length) return;
+
+  const { data: sessions } = await db.from('sessions').select('equip_id, signed_in_at');
+
+  const toDecline = overdue.filter(b => {
+    const start = new Date(b.date + 'T' + b.start_time).getTime();
+    const windowStart = start - NO_SHOW_GRACE_MINS * 60000;
+    const deadline = start + NO_SHOW_GRACE_MINS * 60000;
+    return !(sessions || []).some(s =>
+      s.equip_id === b.equip_id &&
+      new Date(s.signed_in_at).getTime() >= windowStart &&
+      new Date(s.signed_in_at).getTime() <= deadline
+    );
+  });
+  if (!toDecline.length) return;
+
+  await Promise.all(toDecline.map(b => db.from('bookings').update({ status: 'rejected' }).eq('id', b.id)));
+  await fetchBookings();
 }
 
 async function fetchMembers() {
