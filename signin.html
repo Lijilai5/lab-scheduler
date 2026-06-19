@@ -73,7 +73,41 @@ if (!eq) {
   init();
 }
 
+// ── Auto-decline no-shows ────────────────────────────────────────────
+// If a booking's start time + grace period passes with no matching
+// sign-in session, the booking is auto-declined, even if approved.
+const NO_SHOW_GRACE_MINS = 15;
+
+async function autoDeclineNoShowsForMachine() {
+  const now = Date.now();
+  const { data: bookings } = await db.from('bookings').select('*').eq('equip_id', machineId).in('status', ['pending', 'approved']);
+  if (!bookings || !bookings.length) return;
+
+  const overdue = bookings.filter(b => {
+    const start = new Date(b.date + 'T' + b.start_time).getTime();
+    return now >= start + NO_SHOW_GRACE_MINS * 60000;
+  });
+  if (!overdue.length) return;
+
+  const { data: sessions } = await db.from('sessions').select('signed_in_at').eq('equip_id', machineId);
+
+  const toDecline = overdue.filter(b => {
+    const start = new Date(b.date + 'T' + b.start_time).getTime();
+    const windowStart = start - NO_SHOW_GRACE_MINS * 60000;
+    const deadline = start + NO_SHOW_GRACE_MINS * 60000;
+    return !(sessions || []).some(s => {
+      const t = new Date(s.signed_in_at).getTime();
+      return t >= windowStart && t <= deadline;
+    });
+  });
+  if (!toDecline.length) return;
+
+  await Promise.all(toDecline.map(b => db.from('bookings').update({ status: 'rejected' }).eq('id', b.id)));
+}
+
 async function init() {
+  try { await autoDeclineNoShowsForMachine(); } catch(e) { console.error('Auto-decline check failed:', e); }
+
   const { data } = await db.from('sessions').select('*').eq('equip_id', machineId).is('signed_out_at', null).order('signed_in_at', { ascending: false }).limit(1);
   const active = data && data[0];
 
