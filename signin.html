@@ -148,7 +148,6 @@ function renderUI(activeSession) {
   } else {
     el.innerHTML = `
       <div class="form-row"><label>Your name</label><input type="text" id="f-name" placeholder="${currentBooking ? 'Enter the name on your booking' : 'e.g. Alex Kim'}" autocomplete="name"></div>
-      <div class="form-row"><label>Student / Staff ID</label><input type="text" id="f-id" placeholder="e.g. 1234567"></div>
       <button class="btn btn-signin" id="action-btn" onclick="signIn()">Sign in to machine</button>
       <p class="msg" id="signin-error" style="color:var(--red);display:none"></p>
       <div class="success-flash" id="flash"></div>`;
@@ -157,10 +156,9 @@ function renderUI(activeSession) {
 
 async function signIn() {
   const name = document.getElementById('f-name').value.trim();
-  const sid = document.getElementById('f-id').value.trim();
   const errEl = document.getElementById('signin-error');
   errEl.style.display = 'none';
-  if (!name || !sid) { alert('Please enter your name and ID.'); return; }
+  if (!name) { alert('Please enter your name.'); return; }
 
   if (currentBooking && normalizeName(name) !== normalizeName(currentBooking.name)) {
     errEl.textContent = "That name doesn't match the booking for this time slot. Enter the exact name used when booking, or contact the person who booked it.";
@@ -170,7 +168,7 @@ async function signIn() {
 
   const btn = document.getElementById('action-btn');
   btn.disabled = true; btn.textContent = 'Signing in…';
-  const { error } = await db.from('sessions').insert([{ equip_id: machineId, name, student_id: sid }]);
+  const { error } = await db.from('sessions').insert([{ equip_id: machineId, name }]);
   if (error) { alert('Error: ' + error.message); btn.disabled = false; btn.textContent = 'Sign in to machine'; return; }
   showFlash('Signed in! You can close this page.');
   setTimeout(init, 1500);
