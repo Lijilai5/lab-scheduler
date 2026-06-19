@@ -106,7 +106,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 .form-success { display: none; background: var(--green-bg); color: var(--green); border: 1px solid rgba(26,122,74,0.2); border-radius: var(--radius); padding: 14px 18px; font-size: 13px; margin-top: 16px; }
 .form-notice { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(138,94,0,0.2); border-radius: var(--radius); padding: 12px 16px; font-size: 13px; margin-bottom: 20px; }
 
-/* Auth overlay — used for sign-in, register, pending, email-confirm */
 #auth-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 250; }
 #auth-overlay.hidden { display: none; }
 .auth-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px 40px; max-width: 380px; width: 100%; }
@@ -123,7 +122,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 .auth-panels > div { display: none; }
 .auth-panels > div.active { display: block; }
 
-/* PIN screen */
 #pin-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 300; }
 #pin-screen.hidden { display: none; }
 .pin-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px 40px; text-align: center; max-width: 340px; width: 100%; }
@@ -198,19 +196,16 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 .perm-check input { width: 14px; height: 14px; cursor: pointer; accent-color: var(--text); }
 .perm-check.checked { border-color: var(--green); background: var(--green-bg); color: var(--green); font-weight: 500; }
 
-/* Cancel booking button */
 .btn-cancel-booking { font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(154,32,32,0.25); background: transparent; color: var(--red); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.12s; }
 .btn-cancel-booking:hover { background: var(--red-bg); }
 .my-bookings-section { margin-top: 32px; max-width: 560px; }
 .my-bookings-section h2 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 600; margin-bottom: 12px; letter-spacing: -0.3px; }
 
-/* Pending registrations table */
 .reg-table { width: 100%; border-collapse: collapse; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 .reg-table th { background: var(--bg3); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 14px; text-align: left; }
 .reg-table td { padding: 12px 14px; font-size: 13px; border-top: 1px solid var(--border); vertical-align: middle; }
 .reg-table tr:hover td { background: #fafaf7; }
 
-/* Drag-to-book */
 .sg-cell { user-select: none; }
 .sg-cell.drag-highlight { background: #dceef7 !important; }
 .sg-cell.drag-start     { background: #b8dcf0 !important; }
@@ -230,12 +225,9 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 </head>
 <body>
 
-<!-- Auth overlay: sign-in / register / pending / email-confirm panels -->
 <div id="auth-overlay">
   <div class="auth-card">
     <div class="auth-panels" id="auth-panels">
-
-      <!-- Sign in panel -->
       <div id="panel-signin" class="active">
         <h2>Sign in</h2>
         <p class="auth-sub">Sign in to book equipment. You can browse the schedule without signing in.</p>
@@ -249,7 +241,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
         </div>
       </div>
 
-      <!-- Register panel -->
       <div id="panel-register">
         <h2>Create account</h2>
         <p class="auth-sub">Register for lab access. You'll confirm your email, then a staff member will approve your account.</p>
@@ -262,26 +253,22 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
         <div class="auth-alt"><a onclick="showAuthPanel('signin')">← Back to sign in</a></div>
       </div>
 
-      <!-- Email confirmation pending panel -->
       <div id="panel-confirm-email">
         <h2>Check your email</h2>
         <p class="auth-sub">We did not sent a confirmation link to <strong id="confirm-email-addr"></strong>. Do not click it to verify your address, just come back here and sign in.</p>
         <button class="btn-pin" onclick="showAuthPanel('signin')">Back to sign in</button>
       </div>
 
-      <!-- Account pending approval panel -->
       <div id="panel-pending">
         <h2>Account pending</h2>
         <p class="auth-sub">Your email is confirmed ✓<br><br>Your account is waiting for staff approval. You'll be able to book equipment once approved. You can still browse the schedule.</p>
         <button class="btn-pin" onclick="closeAuthOverlay()">Browse schedule</button>
         <div class="auth-alt" style="margin-top:12px"><a onclick="doSignOut()">Sign out</a></div>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- Admin PIN screen -->
 <div id="pin-screen" class="hidden">
   <div class="pin-card">
     <h2>Admin access</h2>
@@ -312,7 +299,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   </div>
 </nav>
 
-<!-- Schedule page -->
 <div class="page active" id="page-schedule">
   <div class="page-header">
     <h1>Equipment availability</h1>
@@ -353,7 +339,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   </div>
 </div>
 
-<!-- Book page -->
 <div class="page" id="page-book">
   <div class="page-header"><h1>Request a booking</h1><p>Fill in the form below. A staff member will approve or decline your request.</p></div>
   <div id="book-not-signed-in" class="form-notice" style="max-width:560px;display:none">
@@ -402,7 +387,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   </div>
 </div>
 
-<!-- Admin page -->
 <div class="page" id="page-admin">
   <div class="admin-header">
     <div class="page-header" style="margin:0"><h1>Admin</h1><p>Manage bookings, members and registrations.</p></div>
@@ -416,8 +400,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <button class="admin-subtab"        id="subtab-registrations" onclick="showAdminTab('registrations')">Registrations <span class="nav-badge" id="reg-count" style="display:none;background:#e05c2a">0</span></button>
     <button class="admin-subtab"        id="subtab-members"       onclick="showAdminTab('members')">Members</button>
   </div>
-
-  <!-- Bookings sub-tab -->
   <div id="admin-bookings-panel">
     <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
       <button class="filter-tab active" onclick="setFilter('all',this)">All</button>
@@ -427,14 +409,10 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     </div>
     <div class="request-list" id="request-list"><div class="empty-state">Loading…</div></div>
   </div>
-
-  <!-- Registrations sub-tab -->
   <div id="admin-registrations-panel" style="display:none">
     <p style="font-size:13px;color:var(--muted);margin-bottom:16px">These users have confirmed their email and are waiting for your approval before they can book equipment.</p>
     <div id="reg-list"><div class="empty-state">Loading…</div></div>
   </div>
-
-  <!-- Members sub-tab -->
   <div id="admin-members-panel" style="display:none">
     <div class="members-toolbar">
       <span style="font-size:13px;color:var(--muted)" id="members-count">Loading…</span>
@@ -448,7 +426,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   </div>
 </div>
 
-<!-- Usage page -->
 <div class="page" id="page-usage">
   <div class="admin-header">
     <div class="page-header" style="margin:0"><h1>Lab usage</h1><p>Live sign-in/out tracking across all machines.</p></div>
@@ -460,7 +437,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   <div class="request-list" id="past-sessions"><div class="empty-state">No sessions yet.</div></div>
 </div>
 
-<!-- Slot booking modal -->
 <div class="modal-overlay" id="slot-modal">
   <div class="modal">
     <h3 id="slot-modal-title">Book this slot</h3>
@@ -497,7 +473,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   </div>
 </div>
 
-<!-- Booking detail popover (schedule page) -->
 <div class="modal-overlay" id="booking-detail-modal">
   <div class="modal" style="max-width:380px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">
@@ -519,7 +494,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   </div>
 </div>
 
-<!-- Member edit modal (admin only) -->
 <div class="modal-overlay" id="member-modal">
   <div class="modal">
     <h3 id="mm-title">Edit member</h3>
@@ -549,7 +523,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 const SUPABASE_URL  = 'https://jhbednwfcgrhusagyuhn.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_b8sY-aUx8FzIGUuxVuOnOQ_EW-C2t1P';
 
-
 const EQUIPMENT = [
   { id: 'e1',  name: 'Fast Scanning Calorimeter',        category: 'Characterization' },
   { id: 'e2',  name: 'Differential Scanning Calorimeter', category: 'Characterization' },
@@ -571,20 +544,30 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 let allBookings = [], allSessions = [], allMembers = [];
 let selectedEquip = null, weekOffset = 0, adminFilter = 'all', adminUnlocked = false;
 let modalSlot = null;
-let currentMember = null; // loaded from members table after auth
+let currentMember = null;
 let editingMemberId = null;
 let calViewYear = new Date().getFullYear(), calViewMonth = new Date().getMonth();
 let adminSubTab = 'bookings';
+
+// ── FIX: AbortController to cancel stale drag event listeners ─────
+// Each call to initDragSelect (triggered by renderWeekGrid on week
+// navigation) was adding new mousedown/mouseenter/mouseup listeners
+// on top of the old ones. The oldest handler fired first, holding a
+// closure over the previous week's cellMap, so clicks on next-week
+// cells resolved to the wrong date strings. We now abort all
+// listeners from the previous render before registering new ones.
+let dragAbort = null;
+
+let _drag = null; // active drag state
 
 // ── Boot ───────────────────────────────────────────────────────────
 (async function boot() {
   setSyncStatus(false, 'Connecting…');
 
-  // Listen for auth state changes — this fires on page load if session exists
   db.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
       if (session) {
-        loadCurrentMember(session.user); // no await, fire and forget
+        loadCurrentMember(session.user);
       } else {
         currentMember = null;
         updateNavMember();
@@ -597,7 +580,6 @@ let adminSubTab = 'bookings';
       renderEquipGrid();
       showAuthOverlay();
     }
-    // return nothing — not async
   });
 
   try {
@@ -613,7 +595,7 @@ let adminSubTab = 'bookings';
 
   db.channel('bookings-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' },
-      () => { fetchBookings(); })  // fire-and-forget wrapper
+      () => { fetchBookings(); })
     .subscribe();
 
   db.channel('sessions-live')
@@ -626,10 +608,8 @@ let adminSubTab = 'bookings';
 })();
 
 async function loadCurrentMember(user) {
-  // Fetch their row from members table (created by trigger on signup)
   const { data: member } = await db.from('members').select('*').eq('id', user.id).single();
   if (!member) {
-    // Trigger may not have run yet — create row manually
     await db.from('members').insert([{
       id: user.id,
       name: user.user_metadata?.name || user.email.split('@')[0],
@@ -657,14 +637,12 @@ async function loadMemberData(member) {
   renderEquipGrid();
   if (selectedEquip) renderWeekGrid();
 
-  // Decide what to show
   if (currentMember.status === 'approved') {
     closeAuthOverlay();
     populateEquipSelect();
   } else if (currentMember.status === 'pending') {
     showAuthPanel('pending');
   } else {
-    // rejected — sign them out
     await db.auth.signOut();
   }
 }
@@ -705,7 +683,6 @@ async function doSignIn() {
 
   btn.disabled = true; btn.textContent = 'Signing in…';
 
-  // Timeout safety — re-enable after 8s no matter what
   const timeout = setTimeout(() => {
     btn.disabled = false; btn.textContent = 'Sign in';
     errEl.textContent = 'Request timed out. Check your connection and try again.';
@@ -725,7 +702,6 @@ async function doSignIn() {
       return;
     }
 
-    // Manually load member in case onAuthStateChange is slow
     if (data?.user) {
       await loadCurrentMember(data.user);
     }
@@ -771,7 +747,9 @@ async function doRegister() {
 async function doSignOut() {
   await db.auth.signOut();
 }
-const ADMIN_PIN     = '4321';
+
+const ADMIN_PIN = '4321';
+
 // ── Pages ──────────────────────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -788,8 +766,8 @@ function showPage(name) {
 }
 
 function renderBookPage() {
-  const notIn   = document.getElementById('book-not-signed-in');
-  const notApp  = document.getElementById('book-not-approved');
+  const notIn    = document.getElementById('book-not-signed-in');
+  const notApp   = document.getElementById('book-not-approved');
   const formCard = document.getElementById('book-form-card');
   notIn.style.display = 'none'; notApp.style.display = 'none'; formCard.style.display = 'none';
   if (!currentMember) {
@@ -1035,9 +1013,9 @@ function closeMemberModal() {
 }
 
 async function saveMember() {
-  const newStatus   = document.getElementById('mm-status').value;
-  const errEl       = document.getElementById('mm-error');
-  const btn         = document.getElementById('mm-submit');
+  const newStatus     = document.getElementById('mm-status').value;
+  const errEl         = document.getElementById('mm-error');
+  const btn           = document.getElementById('mm-submit');
   const selectedPerms = [...document.querySelectorAll('#mm-perms input:checked')].map(i => i.value);
 
   errEl.style.display = 'none';
@@ -1054,7 +1032,6 @@ async function saveMember() {
   document.getElementById('mm-success').style.display = 'block';
   btn.textContent = 'Saved ✓';
 
-  // Refresh logged-in user if they edited themselves
   if (currentMember && currentMember.id === editingMemberId) {
     currentMember.permissions = new Set(selectedPerms);
     currentMember.status = newStatus;
@@ -1087,7 +1064,6 @@ function renderEquipGrid() {
     const upcoming = eqB.filter(b => new Date(b.date + 'T' + b.start_time) > now)
       .sort((a, c) => new Date(a.date + 'T' + a.start_time) - new Date(c.date + 'T' + c.start_time))[0];
 
-    const hasAccess = !currentMember || currentMember.status !== 'approved' || currentMember.permissions.has(eq.id);
     const isApproved = currentMember && currentMember.status === 'approved';
 
     let dot = 'dot-free', txt = 'Available now';
@@ -1114,6 +1090,15 @@ function selectEquip(id) {
   document.getElementById('schedule-section').style.display = 'block';
   renderWeekGrid();
   document.getElementById('schedule-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Local date helper ──────────────────────────────────────────────
+// Returns "YYYY-MM-DD" using LOCAL time (not UTC), avoiding the
+// off-by-one-day issue that toISOString() causes in negative-offset
+// timezones where local midnight falls on the previous UTC day.
+function localDateStr(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 }
 
 // ── Week grid ──────────────────────────────────────────────────────
@@ -1182,7 +1167,11 @@ function renderWeekGrid() {
 
     cellMap[slot] = [];
     days.forEach((day, di) => {
-      const ds = day.toISOString().split('T')[0];
+      // ── FIX: use localDateStr() instead of toISOString().split('T')[0]
+      // toISOString() converts to UTC first, which shifts the date back by
+      // one day in UTC-negative timezones (e.g. Toronto UTC-4), causing
+      // cells in the next week to carry the previous week's date string.
+      const ds = localDateStr(day);
       const cs = new Date(ds + 'T' + ts), ce = new Date(cs.getTime() + 30 * 60000);
       const ov = allBookings.find(b => {
         if (b.equip_id !== selectedEquip) return false;
@@ -1201,7 +1190,6 @@ function renderWeekGrid() {
       if (ov) {
         const bs = new Date(ov.date + 'T' + ov.start_time);
         const be = new Date(bs.getTime() + ov.duration * 60000);
-        // Render block segment: show at first slot this booking touches in this day column
         if (bs <= cs && be > cs) {
           const prevSlotTime = new Date(cs.getTime() - 30 * 60000);
           const isFirstSlotInCol = bs > prevSlotTime || slot === 0;
@@ -1237,20 +1225,26 @@ function renderWeekGrid() {
     });
   }
 
-  // Show drag hint if user has access
   const hintEl = document.getElementById('drag-hint');
   if (hintEl) hintEl.style.display = hasAccess ? 'flex' : 'none';
 
-  // Drag-to-select logic (only for users with access)
   if (hasAccess) {
     initDragSelect(grid, cellMap, days, eq);
   }
 }
 
 // ── Drag-to-select on schedule grid ───────────────────────────────
-let _drag = null; // active drag state
-
 function initDragSelect(grid, cellMap, days, eq) {
+  // ── FIX: abort listeners from the previous week's render ─────────
+  // Without this, every call to renderWeekGrid (triggered by Prev/Next
+  // week navigation) stacks another set of mousedown/mouseenter/mouseup
+  // handlers on the same grid element. The first-registered handler
+  // always fires first, holding a stale closure over the old cellMap,
+  // so clicks on next-week cells resolved to this-week date strings.
+  if (dragAbort) { dragAbort.abort(); }
+  dragAbort = new AbortController();
+  const sig = dragAbort.signal;
+
   let dragPreview = null;
 
   function clearHighlights() {
@@ -1268,7 +1262,6 @@ function initDragSelect(grid, cellMap, days, eq) {
       if (!c || c.dataset.booked === '1') break;
       c.classList.add(s === lo ? 'drag-start' : 'drag-highlight');
     }
-    // Render floating preview label in the start cell
     const startCell = cellMap[lo] && cellMap[lo][di];
     if (startCell) {
       const slots = hi - lo + 1;
@@ -1284,7 +1277,6 @@ function initDragSelect(grid, cellMap, days, eq) {
     }
   }
 
-  // Attach mousedown on each free cell
   for (let slot = 0; slot < 48; slot++) {
     days.forEach((day, di) => {
       const cell = cellMap[slot] && cellMap[slot][di];
@@ -1295,17 +1287,16 @@ function initDragSelect(grid, cellMap, days, eq) {
         e.preventDefault();
         _drag = { startSlot: slot, curSlot: slot, di, ds: cell.dataset.ds, ts: cell.dataset.ts, eq, moved: false };
         cell.classList.add('drag-start');
-      });
+      }, { signal: sig });
 
       cell.addEventListener('mouseenter', () => {
         if (!_drag || _drag.di !== di) return;
-        // Stop if we hit a booked cell
         const blocked = isRangeBlocked(_drag.startSlot, slot, di, cellMap);
         if (blocked) return;
         _drag.curSlot = slot;
         _drag.moved = true;
         applyHighlights(_drag.startSlot, slot, di);
-      });
+      }, { signal: sig });
     });
   }
 
@@ -1323,12 +1314,12 @@ function initDragSelect(grid, cellMap, days, eq) {
     _drag = null;
     e.stopPropagation();
     openSlotModalWithDuration(ds, ts, dragEq, durMin);
-  });
+  }, { signal: sig });
 
-  // Cancel drag on mouseup anywhere outside the grid
+  // Cancel drag if mouse is released outside the grid
   document.addEventListener('mouseup', () => {
     if (_drag) { clearHighlights(); _drag = null; }
-  }, { once: false });
+  }, { signal: sig });
 }
 
 function isRangeBlocked(startSlot, endSlot, di, cellMap) {
@@ -1342,7 +1333,6 @@ function isRangeBlocked(startSlot, endSlot, di, cellMap) {
 
 function openSlotModalWithDuration(ds, ts, eq, durMin) {
   openSlotModal(ds, ts, eq);
-  // Pre-fill duration
   const hours = Math.floor(durMin / 60), mins = durMin % 60;
   const hoursEl = document.getElementById('sm-dur-hours');
   const minsEl  = document.getElementById('sm-dur-mins');
@@ -1362,6 +1352,7 @@ function toggleCal(e) {
 }
 
 function closeCal() { document.getElementById('cal-dropdown').classList.remove('open'); }
+
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     fetchBookings().then(() => setSyncStatus(true, 'Live'))
@@ -1394,7 +1385,7 @@ function renderCalDays(currentWeekDays) {
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('cal-month-label').textContent = months[calViewMonth] + ' ' + calViewYear;
   const today   = new Date(); today.setHours(0,0,0,0);
-  const weekSet = new Set(currentWeekDays.map(d => d.toISOString().split('T')[0]));
+  const weekSet = new Set(currentWeekDays.map(d => localDateStr(d)));
   const firstDay = new Date(calViewYear, calViewMonth, 1);
   const lastDay  = new Date(calViewYear, calViewMonth + 1, 0);
   let startDow = firstDay.getDay(); startDow = startDow === 0 ? 6 : startDow - 1;
@@ -1402,7 +1393,7 @@ function renderCalDays(currentWeekDays) {
   for (let i = 0; i < startDow; i++) html += `<div class="cal-day empty"></div>`;
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const dt = new Date(calViewYear, calViewMonth, d);
-    const ds = dt.toISOString().split('T')[0];
+    const ds = localDateStr(dt);
     const isToday = dt.getTime() === today.getTime();
     const inWeek  = weekSet.has(ds);
     const cls = ['cal-day', isToday ? 'today' : '', inWeek ? 'in-week' : ''].filter(Boolean).join(' ');
@@ -1486,7 +1477,6 @@ function openBookingDetail(b) {
   document.getElementById('bd-purpose').textContent  = b.purpose || '—';
   document.getElementById('bd-error').style.display  = 'none';
 
-  // Show cancel button only if this booking belongs to the current user
   const isOwner = currentMember && b.email === currentMember.email;
   const canCancel = isOwner && (b.status === 'pending' || b.status === 'approved');
   document.getElementById('bd-cancel-btn').style.display = canCancel ? 'block' : 'none';
@@ -1555,7 +1545,6 @@ function renderMyBookings() {
 
 async function cancelBooking(id) {
   if (!currentMember) return;
-  // Verify the booking actually belongs to the current user before deleting
   const booking = allBookings.find(b => b.id === id);
   if (!booking || booking.email !== currentMember.email) {
     alert('You can only cancel your own bookings.'); return;
@@ -1579,7 +1568,6 @@ function syncDuration(prefix) {
     document.getElementById(prefix + '-dur-mins').value  = 0;
   }
   document.getElementById(prefix + '-duration').value = total < 30 ? 30 : total;
-  // Update label
   const label = document.getElementById(prefix + '-dur-label');
   if (total <= 0) { label.textContent = '— (min 30 min)'; return; }
   const h = Math.floor(total / 60), m = total % 60;
