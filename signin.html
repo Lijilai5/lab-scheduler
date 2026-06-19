@@ -77,7 +77,7 @@ async function init() {
   const { data } = await db.from('sessions').select('*').eq('equip_id', machineId).is('signed_out_at', null).order('signed_in_at', { ascending: false }).limit(1);
   const active = data && data[0];
 
-  const { data: bookingData } = await db.from('bookings').select('*').eq('equip_id', machineId).eq('status', 'approved');
+  const { data: bookingData } = await db.from('bookings').select('*').eq('equip_id', machineId).in('status', ['pending', 'approved']);
   const now = new Date();
   currentBooking = (bookingData || []).find(b => {
     const start = new Date(b.date + 'T' + b.start_time);
@@ -111,13 +111,9 @@ function renderUI(activeSession) {
       <button class="btn btn-signout" id="action-btn" onclick="signOut('${activeSession.id}', '${activeSession.signed_in_at}')">Sign out</button>
       <p class="msg">Not you? Ask them to scan and sign out, or contact staff.</p>
       <div class="success-flash" id="flash"></div>`;
-  } else if (!currentBooking) {
-    el.innerHTML = `
-      <p class="msg" style="margin-top:0">No approved booking covers this machine right now.</p>
-      <p class="msg">You need an approved booking for this time slot to sign in. Please book this machine first, or contact staff if you believe this is an error.</p>`;
   } else {
     el.innerHTML = `
-      <div class="form-row"><label>Your name</label><input type="text" id="f-name" placeholder="Enter the name on your booking" autocomplete="name"></div>
+      <div class="form-row"><label>Your name</label><input type="text" id="f-name" placeholder="${currentBooking ? 'Enter the name on your booking' : 'e.g. Alex Kim'}" autocomplete="name"></div>
       <div class="form-row"><label>Student / Staff ID</label><input type="text" id="f-id" placeholder="e.g. 1234567"></div>
       <button class="btn btn-signin" id="action-btn" onclick="signIn()">Sign in to machine</button>
       <p class="msg" id="signin-error" style="color:var(--red);display:none"></p>
@@ -132,8 +128,8 @@ async function signIn() {
   errEl.style.display = 'none';
   if (!name || !sid) { alert('Please enter your name and ID.'); return; }
 
-  if (!currentBooking || normalizeName(name) !== normalizeName(currentBooking.name)) {
-    errEl.textContent = "That name doesn't match the approved booking for this time slot. Enter the exact name used when booking, or contact the person who booked it.";
+  if (currentBooking && normalizeName(name) !== normalizeName(currentBooking.name)) {
+    errEl.textContent = "That name doesn't match the booking for this time slot. Enter the exact name used when booking, or contact the person who booked it.";
     errEl.style.display = 'block';
     return;
   }
