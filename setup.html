@@ -105,12 +105,20 @@ async function setPassword() {
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
 
-  const { error } = await db.auth.updateUser({ password: pass });
+  const { data: { user }, error } = await db.auth.updateUser({ password: pass });
   if (error) {
     err.textContent = 'Error: ' + error.message;
     err.style.display = 'block';
     btn.disabled = false; btn.textContent = 'Set password & go to app';
     return;
+  }
+
+  // Create the members row as pending so the admin can approve it
+  if (user) {
+    await db.from('members').upsert(
+      { id: user.id, email: user.email, name: '', status: 'pending' },
+      { onConflict: 'email', ignoreDuplicates: true }
+    );
   }
 
   ok.textContent = '✓ Password set! Taking you to the app…';
