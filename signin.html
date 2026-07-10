@@ -16,6 +16,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
 .equip-name { font-size:20px; font-weight:500; margin-bottom:24px; }
 .form-row { margin-bottom:14px; text-align:left; }
 .form-row label { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:500; text-transform:uppercase; letter-spacing:0.3px; }
+.form-row .label-note { font-weight:400; text-transform:none; letter-spacing:0; font-size:11px; }
 .form-row input { width:100%; padding:10px 12px; border:1px solid var(--border2); border-radius:var(--radius); font-size:15px; font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); outline:none; }
 .form-row input:focus { border-color:var(--text); }
 .btn { width:100%; padding:12px; border:none; border-radius:var(--radius); font-size:15px; font-weight:500; font-family:'DM Sans',sans-serif; cursor:pointer; margin-top:4px; transition:opacity 0.15s; }
@@ -25,7 +26,9 @@ body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text)
 .status-active { background:var(--green-bg); border-radius:var(--radius); padding:16px; margin-bottom:20px; }
 .status-active .who { font-size:17px; font-weight:500; color:var(--green); }
 .status-active .since { font-size:13px; color:var(--green); opacity:0.8; margin-top:3px; }
+.status-active .pin-note { font-size:12px; color:var(--green); opacity:0.7; margin-top:6px; }
 .msg { font-size:13px; color:var(--muted); margin-top:14px; }
+.error-msg { font-size:13px; color:var(--red); margin-top:10px; display:none; }
 .success-flash { background:var(--green-bg); color:var(--green); border-radius:var(--radius); padding:14px; font-size:14px; margin-top:14px; display:none; }
 </style>
 </head>
@@ -57,6 +60,7 @@ const EQUIPMENT = [
   { id:'e13', name:'Batch Foaming Station', category:'Processing', icon:'🧪' },
 ];
 
+const NO_SHOW_GRACE_MINS = 15;
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 const params = new URLSearchParams(location.search);
 const machineId = params.get('machine');
@@ -73,11 +77,11 @@ if (!eq) {
   init();
 }
 
-// ── Auto-decline no-shows ────────────────────────────────────────────
-// If a booking's start time + grace period passes with no matching
-// sign-in session, the booking is auto-declined, even if approved.
-const NO_SHOW_GRACE_MINS = 15;
+function normalizeName(s) {
+  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
 
+// ── Auto-decline no-shows ────────────────────────────────────────────
 async function autoDeclineNoShowsForMachine() {
   const now = Date.now();
   const { data: bookings } = await db.from('bookings').select('*').eq('equip_id', machineId).in('status', ['pending', 'approved']);
@@ -122,10 +126,6 @@ async function init() {
   renderUI(active);
 }
 
-function normalizeName(s) {
-  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
 function timeSince(dateStr) {
   const diff = Math.floor((Date.now() - new Date(dateStr)) / 60000);
   if (diff < 1) return 'just now';
@@ -137,28 +137,41 @@ function timeSince(dateStr) {
 function renderUI(activeSession) {
   const el = document.getElementById('main-content');
   if (activeSession) {
+    const pinProtected = !!activeSession.pin;
     el.innerHTML = `
       <div class="status-active">
         <div class="who">${activeSession.name}</div>
         <div class="since">Signed in ${timeSince(activeSession.signed_in_at)}</div>
+        ${pinProtected ? '<div class="pin-note">🔒 PIN required to sign out</div>' : ''}
       </div>
-      <button class="btn btn-signout" id="action-btn" onclick="signOut('${activeSession.id}', '${activeSession.signed_in_at}')">Sign out</button>
-      <p class="msg">Not you? Ask them to scan and sign out, or contact staff.</p>
+      ${pinProtected ? `
+        <div class="form-row"><label>PIN</label><input type="password" id="f-signout-pin" placeholder="Enter 4-digit PIN" maxlength="4" inputmode="numeric"></div>
+      ` : ''}
+      <button class="btn btn-signout" id="action-btn" onclick="signOut('${activeSession.id}', '${activeSession.signed_in_at}', ${pinProtected})">Sign out</button>
+      ${!pinProtected ? '<p class="msg">Not you? Ask them to scan and sign out, or contact staff.</p>' : ''}
+      <p class="error-msg" id="signin-error"></p>
       <div class="success-flash" id="flash"></div>`;
   } else {
     el.innerHTML = `
       <div class="form-row"><label>Your name</label><input type="text" id="f-name" placeholder="${currentBooking ? 'Enter the name on your booking' : 'e.g. Alex Kim'}" autocomplete="name"></div>
+      <div class="form-row">
+        <label>PIN <span class="label-note">(optional — required to sign out if set)</span></label>
+        <input type="password" id="f-pin" placeholder="Leave blank for no PIN" maxlength="4" inputmode="numeric" pattern="[0-9]{4}">
+      </div>
       <button class="btn btn-signin" id="action-btn" onclick="signIn()">Sign in to machine</button>
-      <p class="msg" id="signin-error" style="color:var(--red);display:none"></p>
+      <p class="error-msg" id="signin-error"></p>
       <div class="success-flash" id="flash"></div>`;
   }
 }
 
 async function signIn() {
   const name = document.getElementById('f-name').value.trim();
+  const pin = document.getElementById('f-pin').value.trim();
   const errEl = document.getElementById('signin-error');
   errEl.style.display = 'none';
+
   if (!name) { alert('Please enter your name.'); return; }
+  if (pin && (!/^\d{4}$/.test(pin))) { alert('PIN must be exactly 4 digits.'); return; }
 
   if (currentBooking && normalizeName(name) !== normalizeName(currentBooking.name)) {
     errEl.textContent = "That name doesn't match the booking for this time slot. Enter the exact name used when booking, or contact the person who booked it.";
@@ -168,13 +181,31 @@ async function signIn() {
 
   const btn = document.getElementById('action-btn');
   btn.disabled = true; btn.textContent = 'Signing in…';
-  const { error } = await db.from('sessions').insert([{ equip_id: machineId, name }]);
+  const insertData = { equip_id: machineId, name };
+  if (pin) insertData.pin = pin;
+  const { error } = await db.from('sessions').insert([insertData]);
   if (error) { alert('Error: ' + error.message); btn.disabled = false; btn.textContent = 'Sign in to machine'; return; }
   showFlash('Signed in! You can close this page.');
   setTimeout(init, 1500);
 }
 
-async function signOut(id, signedInAt) {
+async function signOut(id, signedInAt, pinProtected) {
+  const errEl = document.getElementById('signin-error');
+  errEl.style.display = 'none';
+
+  if (pinProtected) {
+    const entered = (document.getElementById('f-signout-pin').value || '').trim();
+    if (!entered) { errEl.textContent = 'Please enter your PIN to sign out.'; errEl.style.display = 'block'; return; }
+
+    // Fetch the session to verify PIN
+    const { data } = await db.from('sessions').select('pin').eq('id', id).single();
+    if (!data || entered !== data.pin) {
+      errEl.textContent = 'Incorrect PIN. Try again or contact staff.';
+      errEl.style.display = 'block';
+      return;
+    }
+  }
+
   const btn = document.getElementById('action-btn');
   btn.disabled = true; btn.textContent = 'Signing out…';
   const duration = Math.round((Date.now() - new Date(signedInAt)) / 60000);
