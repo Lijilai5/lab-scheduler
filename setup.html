@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Set Up Your Account — MCML Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root { --bg:#f7f6f2; --bg2:#fff; --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.14); --text:#1a1a18; --muted:#6b6b63; --green:#1a7a4a; --green-bg:#e6f4ed; --red:#9a2020; --red-bg:#fdeaea; --radius:8px; --radius-lg:14px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); padding:36px 28px; max-width:380px; width:100%; text-align:center; }
+.logo { font-size:28px; margin-bottom:12px; }
+h2 { font-size:20px; font-weight:500; margin-bottom:6px; }
+.subtitle { font-size:14px; color:var(--muted); margin-bottom:28px; }
+.form-row { margin-bottom:14px; text-align:left; }
+.form-row label { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:500; text-transform:uppercase; letter-spacing:0.3px; }
+.form-row input { width:100%; padding:10px 12px; border:1px solid var(--border2); border-radius:var(--radius); font-size:15px; font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); outline:none; }
+.form-row input:focus { border-color:var(--text); }
+.btn { width:100%; padding:12px; border:none; border-radius:var(--radius); font-size:15px; font-weight:500; font-family:'DM Sans',sans-serif; cursor:pointer; margin-top:4px; background:var(--text); color:#f7f6f2; transition:opacity 0.15s; }
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.error { background:var(--red-bg); color:var(--red); border-radius:var(--radius); padding:12px; font-size:13px; margin-top:14px; display:none; }
+.success { background:var(--green-bg); color:var(--green); border-radius:var(--radius); padding:16px; font-size:14px; margin-top:14px; display:none; }
+.strength { height:3px; border-radius:2px; margin-top:6px; background:var(--border2); overflow:hidden; }
+.strength-bar { height:100%; width:0; border-radius:2px; transition:width 0.2s, background 0.2s; }
+.hint { font-size:11px; color:var(--muted); margin-top:5px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🔬</div>
+  <h2>Set up your account</h2>
+  <p class="subtitle" id="subtitle">Create a password to access the MCML lab booking system.</p>
+  <div id="main"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://jhbednwfcgrhusagyuhn.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_b8sY-aUx8FzIGUuxVuOnOQ_EW-C2t1P';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const params = new URLSearchParams(location.search);
+const tokenHash = params.get('token');
+const type = params.get('type');
+
+async function init() {
+  const el = document.getElementById('main');
+
+  if (!tokenHash || type !== 'invite') {
+    document.getElementById('subtitle').textContent = '';
+    el.innerHTML = `<div class="error" style="display:block">Invalid or missing invite link. Please ask your admin to resend the invitation.</div>`;
+    return;
+  }
+
+  // Verify the OTP token first to establish a session
+  const { error } = await db.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' });
+  if (error) {
+    document.getElementById('subtitle').textContent = '';
+    el.innerHTML = `<div class="error" style="display:block">This invite link has expired or already been used. Please ask your admin to resend the invitation.</div>`;
+    return;
+  }
+
+  // Token valid — show the password setup form
+  el.innerHTML = `
+    <div class="form-row">
+      <label>Password</label>
+      <input type="password" id="f-pass" placeholder="At least 8 characters" oninput="checkStrength()">
+      <div class="strength"><div class="strength-bar" id="strength-bar"></div></div>
+    </div>
+    <div class="form-row">
+      <label>Confirm password</label>
+      <input type="password" id="f-confirm" placeholder="Repeat your password">
+    </div>
+    <button class="btn" id="submit-btn" onclick="setPassword()">Set password & go to app</button>
+    <div class="error" id="err"></div>
+    <div class="success" id="ok"></div>
+  `;
+}
+
+function checkStrength() {
+  const val = document.getElementById('f-pass').value;
+  const bar = document.getElementById('strength-bar');
+  let score = 0;
+  if (val.length >= 8) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  const colors = ['#e55', '#e96', '#ca0', '#1a7a4a'];
+  const widths = ['25%', '50%', '75%', '100%'];
+  bar.style.width = val.length ? widths[score - 1] || '25%' : '0';
+  bar.style.background = val.length ? colors[score - 1] || '#e55' : '';
+}
+
+async function setPassword() {
+  const pass = document.getElementById('f-pass').value;
+  const confirm = document.getElementById('f-confirm').value;
+  const err = document.getElementById('err');
+  const ok = document.getElementById('ok');
+  err.style.display = 'none';
+
+  if (pass.length < 8) { err.textContent = 'Password must be at least 8 characters.'; err.style.display = 'block'; return; }
+  if (pass !== confirm) { err.textContent = 'Passwords don\'t match.'; err.style.display = 'block'; return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const { error } = await db.auth.updateUser({ password: pass });
+  if (error) {
+    err.textContent = 'Error: ' + error.message;
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Set password & go to app';
+    return;
+  }
+
+  ok.textContent = '✓ Password set! Taking you to the app…';
+  ok.style.display = 'block';
+  btn.style.display = 'none';
+  setTimeout(() => { location.href = 'https://lijilai5.github.io/lab-scheduler/'; }, 2000);
+}
+
+init();
+</script>
+</body>
+</html>
