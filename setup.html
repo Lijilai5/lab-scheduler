@@ -10,28 +10,26 @@
 :root { --bg:#f7f6f2; --bg2:#fff; --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.14); --text:#1a1a18; --muted:#6b6b63; --green:#1a7a4a; --green-bg:#e6f4ed; --red:#9a2020; --red-bg:#fdeaea; --radius:8px; --radius-lg:14px; }
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
-.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); padding:36px 28px; max-width:380px; width:100%; text-align:center; }
-.logo { font-size:28px; margin-bottom:12px; }
-h2 { font-size:20px; font-weight:500; margin-bottom:6px; }
-.subtitle { font-size:14px; color:var(--muted); margin-bottom:28px; }
-.form-row { margin-bottom:14px; text-align:left; }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); padding:36px 32px; max-width:420px; width:100%; }
+h2 { font-size:22px; font-weight:600; margin-bottom:6px; }
+.subtitle { font-size:14px; color:var(--muted); margin-bottom:28px; line-height:1.5; }
+.form-row { margin-bottom:16px; }
 .form-row label { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:500; text-transform:uppercase; letter-spacing:0.3px; }
-.form-row input { width:100%; padding:10px 12px; border:1px solid var(--border2); border-radius:var(--radius); font-size:15px; font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); outline:none; }
+.form-row input { width:100%; padding:11px 14px; border:1px solid var(--border2); border-radius:var(--radius); font-size:15px; font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); outline:none; transition:border-color 0.15s; }
 .form-row input:focus { border-color:var(--text); }
-.btn { width:100%; padding:12px; border:none; border-radius:var(--radius); font-size:15px; font-weight:500; font-family:'DM Sans',sans-serif; cursor:pointer; margin-top:4px; background:var(--text); color:#f7f6f2; transition:opacity 0.15s; }
-.btn:disabled { opacity:0.5; cursor:not-allowed; }
-.error { background:var(--red-bg); color:var(--red); border-radius:var(--radius); padding:12px; font-size:13px; margin-top:14px; display:none; }
-.success { background:var(--green-bg); color:var(--green); border-radius:var(--radius); padding:16px; font-size:14px; margin-top:14px; display:none; }
+.form-row input[readonly] { opacity:0.6; cursor:default; }
 .strength { height:3px; border-radius:2px; margin-top:6px; background:var(--border2); overflow:hidden; }
 .strength-bar { height:100%; width:0; border-radius:2px; transition:width 0.2s, background 0.2s; }
-.hint { font-size:11px; color:var(--muted); margin-top:5px; }
+.btn { width:100%; padding:13px; border:none; border-radius:var(--radius); font-size:15px; font-weight:500; font-family:'DM Sans',sans-serif; cursor:pointer; margin-top:4px; background:var(--text); color:#f7f6f2; transition:opacity 0.15s; }
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.error { background:var(--red-bg); color:var(--red); border-radius:var(--radius); padding:12px; font-size:13px; margin-top:14px; display:none; }
+.success { background:var(--green-bg); color:var(--green); border-radius:var(--radius); padding:14px; font-size:14px; margin-top:14px; display:none; }
 </style>
 </head>
 <body>
 <div class="card">
-  <div class="logo">🔬</div>
-  <h2>Set up your account</h2>
-  <p class="subtitle" id="subtitle">Create a password to access the MCML lab booking system.</p>
+  <h2>Create account</h2>
+  <p class="subtitle" id="subtitle">Register for lab access. A staff member will approve your account.</p>
   <div id="main"></div>
 </div>
 
@@ -53,29 +51,35 @@ async function init() {
     return;
   }
 
-  // Verify the OTP token first to establish a session
-  const { error } = await db.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' });
+  // Verify the OTP token to establish a session and get the user's email
+  const { data, error } = await db.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' });
   if (error) {
     document.getElementById('subtitle').textContent = '';
     el.innerHTML = `<div class="error" style="display:block">This invite link has expired or already been used. Please ask your admin to resend the invitation.</div>`;
     return;
   }
 
-  // Token valid — show the password setup form
+  const email = data?.user?.email || '';
+
   el.innerHTML = `
     <div class="form-row">
-      <label>Password</label>
-      <input type="password" id="f-pass" placeholder="At least 8 characters" oninput="checkStrength()">
-      <div class="strength"><div class="strength-bar" id="strength-bar"></div></div>
+      <label>Full name</label>
+      <input type="text" id="f-name" placeholder="Alex Kim" autocomplete="name">
     </div>
     <div class="form-row">
-      <label>Confirm password</label>
-      <input type="password" id="f-confirm" placeholder="Repeat your password">
+      <label>Email</label>
+      <input type="email" id="f-email" value="${email}" readonly>
     </div>
-    <button class="btn" id="submit-btn" onclick="setPassword()">Set password & go to app</button>
+    <div class="form-row">
+      <label>Password</label>
+      <input type="password" id="f-pass" placeholder="Min. 8 characters" oninput="checkStrength()">
+      <div class="strength"><div class="strength-bar" id="strength-bar"></div></div>
+    </div>
+    <button class="btn" id="submit-btn" onclick="createAccount()">Create account</button>
     <div class="error" id="err"></div>
     <div class="success" id="ok"></div>
   `;
+  document.getElementById('f-name').focus();
 }
 
 function checkStrength() {
@@ -86,42 +90,40 @@ function checkStrength() {
   if (/[A-Z]/.test(val)) score++;
   if (/[0-9]/.test(val)) score++;
   if (/[^A-Za-z0-9]/.test(val)) score++;
-  const colors = ['#e55', '#e96', '#ca0', '#1a7a4a'];
-  const widths = ['25%', '50%', '75%', '100%'];
-  bar.style.width = val.length ? widths[score - 1] || '25%' : '0';
-  bar.style.background = val.length ? colors[score - 1] || '#e55' : '';
+  bar.style.width = val.length ? (['25%','50%','75%','100%'][score-1] || '25%') : '0';
+  bar.style.background = val.length ? (['#e55','#e96','#ca0','#1a7a4a'][score-1] || '#e55') : '';
 }
 
-async function setPassword() {
+async function createAccount() {
+  const name = document.getElementById('f-name').value.trim();
   const pass = document.getElementById('f-pass').value;
-  const confirm = document.getElementById('f-confirm').value;
-  const err = document.getElementById('err');
-  const ok = document.getElementById('ok');
+  const err  = document.getElementById('err');
+  const ok   = document.getElementById('ok');
   err.style.display = 'none';
 
+  if (!name) { err.textContent = 'Please enter your full name.'; err.style.display = 'block'; return; }
   if (pass.length < 8) { err.textContent = 'Password must be at least 8 characters.'; err.style.display = 'block'; return; }
-  if (pass !== confirm) { err.textContent = 'Passwords don\'t match.'; err.style.display = 'block'; return; }
 
   const btn = document.getElementById('submit-btn');
-  btn.disabled = true; btn.textContent = 'Saving…';
+  btn.disabled = true; btn.textContent = 'Creating account…';
 
-  const { data: { user }, error } = await db.auth.updateUser({ password: pass });
-  if (error) {
-    err.textContent = 'Error: ' + error.message;
+  const { data: { user }, error: pwErr } = await db.auth.updateUser({ password: pass });
+  if (pwErr) {
+    err.textContent = 'Error: ' + pwErr.message;
     err.style.display = 'block';
-    btn.disabled = false; btn.textContent = 'Set password & go to app';
+    btn.disabled = false; btn.textContent = 'Create account';
     return;
   }
 
-  // Create the members row as pending so the admin can approve it
+  // Save name + create pending members row
   if (user) {
     await db.from('members').upsert(
-      { id: user.id, email: user.email, name: '', status: 'pending' },
-      { onConflict: 'email', ignoreDuplicates: true }
+      { id: user.id, email: user.email, name, status: 'pending' },
+      { onConflict: 'email' }
     );
   }
 
-  ok.textContent = '✓ Password set! Taking you to the app…';
+  ok.textContent = '✓ Account created! Taking you to the app…';
   ok.style.display = 'block';
   btn.style.display = 'none';
   setTimeout(() => { location.href = 'https://lijilai5.github.io/lab-scheduler/'; }, 2000);
