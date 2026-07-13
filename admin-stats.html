@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCML Lab — Admin Statistics</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #f0ede6;
+  --surface: #faf9f6;
+  --surface2: #fff;
+  --border: rgba(0,0,0,0.07);
+  --border2: rgba(0,0,0,0.13);
+  --text: #17170f;
+  --muted: #6b6859;
+  --accent: #2d6a4f;
+  --accent-light: #e8f5ee;
+  --red: #8b2020;
+  --red-bg: #fdeaea;
+  --amber: #7a4f00;
+  --amber-bg: #fef3e2;
+  --mono: 'DM Mono', monospace;
+  --radius: 10px;
+  --radius-lg: 16px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── Header ── */
+.header { background: var(--text); color: var(--bg); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+.header-left { display: flex; align-items: center; gap: 14px; }
+.header-logo { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+.header-sub { font-size: 12px; opacity: 0.5; font-weight: 300; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+.live-label { font-size: 12px; opacity: 0.6; font-family: var(--mono); }
+.refresh-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: inherit; font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+.refresh-btn:hover { background: rgba(255,255,255,0.18); }
+
+/* ── Layout ── */
+.main { max-width: 1200px; margin: 0 auto; padding: 32px 24px 64px; }
+.section-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 14px; margin-top: 36px; }
+.section-title:first-child { margin-top: 0; }
+
+/* ── KPI row ── */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px 22px; }
+.kpi-value { font-size: 34px; font-weight: 600; letter-spacing: -1px; line-height: 1; font-family: var(--mono); }
+.kpi-label { font-size: 12px; color: var(--muted); margin-top: 6px; font-weight: 400; }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 3px; opacity: 0.7; }
+.kpi.green .kpi-value { color: var(--accent); }
+.kpi.red .kpi-value { color: var(--red); }
+.kpi.amber .kpi-value { color: var(--amber); }
+
+/* ── Two-col ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ── Card ── */
+.card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.card-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; justify-content: space-between; }
+.card-title { font-size: 14px; font-weight: 500; }
+.card-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+/* ── Bar chart ── */
+.bar-list { padding: 14px 20px; display: flex; flex-direction: column; gap: 11px; }
+.bar-row { display: grid; grid-template-columns: 110px 1fr 52px; align-items: center; gap: 10px; }
+.bar-label { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { background: var(--bg); border-radius: 3px; height: 8px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+.bar-fill.amber { background: #d4800a; }
+.bar-fill.steel { background: #5b7fa6; }
+.bar-val { font-size: 12px; font-family: var(--mono); color: var(--text); text-align: right; }
+
+/* ── Table ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { padding: 10px 16px; text-align: left; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); border-bottom: 1px solid var(--border); background: var(--surface); white-space: nowrap; }
+tbody td { padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--bg); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+.badge-approved { background: var(--accent-light); color: var(--accent); }
+.badge-pending { background: var(--amber-bg); color: var(--amber); }
+.badge-rejected { background: var(--red-bg); color: var(--red); }
+.badge-active { background: var(--accent-light); color: var(--accent); }
+
+/* ── Activity feed ── */
+.feed { padding: 6px 0; }
+.feed-item { display: flex; gap: 14px; padding: 10px 20px; align-items: flex-start; border-bottom: 1px solid var(--border); }
+.feed-item:last-child { border-bottom: none; }
+.feed-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.feed-dot.green { background: var(--accent); }
+.feed-dot.amber { background: #d4800a; }
+.feed-dot.red { background: var(--red); }
+.feed-dot.blue { background: #3b7ac7; }
+.feed-body { flex: 1; }
+.feed-text { font-size: 13px; line-height: 1.4; }
+.feed-time { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+
+/* ── Utilisation heatmap ── */
+.heat-grid { padding: 16px 20px 20px; }
+.heat-label { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+.heat-row { display: flex; gap: 3px; margin-bottom: 3px; align-items: center; }
+.heat-eq-label { font-size: 10px; color: var(--muted); width: 88px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); }
+.heat-cell { width: 18px; height: 18px; border-radius: 3px; flex-shrink: 0; }
+.heat-hours { display: flex; gap: 3px; margin-left: 88px; margin-top: 4px; }
+.heat-hour-label { width: 18px; font-size: 9px; color: var(--muted); text-align: center; }
+
+/* ── Loading / empty ── */
+.loading { padding: 32px; text-align: center; color: var(--muted); font-size: 13px; }
+.empty { padding: 24px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span class="header-logo">MCML Lab</span>
+    <span class="header-sub">Admin Statistics</span>
+  </div>
+  <div class="header-right">
+    <div class="live-dot"></div>
+    <span class="live-label">live</span>
+    <button class="refresh-btn" onclick="loadAll()">↺ Refresh</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- KPIs -->
+  <div class="section-title">Overview</div>
+  <div class="kpi-grid" id="kpi-grid"><div class="loading">Loading…</div></div>
+
+  <!-- Equipment usage + Member activity -->
+  <div class="section-title">Equipment</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Sessions by machine</span><span class="card-meta" id="sessions-meta"></span></div>
+      <div class="bar-list" id="sessions-bars"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Total hours used</span><span class="card-meta" id="hours-meta"></span></div>
+      <div class="bar-list" id="hours-bars"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Hour-of-day heatmap -->
+  <div class="section-title">Usage patterns — sign-ins by hour</div>
+  <div class="card">
+    <div class="heat-grid" id="heat-grid"><div class="loading">Loading…</div></div>
+  </div>
+
+  <!-- Top users + Bookings by status -->
+  <div class="section-title">Members & bookings</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Top users by time</span><span class="card-meta" id="users-meta"></span></div>
+      <div class="bar-list" id="users-bars"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Bookings by status</span></div>
+      <div class="bar-list" id="bookings-status-bars"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Recent sessions table -->
+  <div class="section-title">Recent sessions</div>
+  <div class="card">
+    <div class="table-wrap">
+      <table id="sessions-table">
+        <thead><tr><th>User</th><th>Machine</th><th>Signed in</th><th>Duration</th><th>Status</th></tr></thead>
+        <tbody><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent bookings table -->
+  <div class="section-title">Recent bookings</div>
+  <div class="card">
+    <div class="table-wrap">
+      <table id="bookings-table">
+        <thead><tr><th>Name</th><th>Machine</th><th>Date</th><th>Start</th><th>Duration</th><th>Purpose</th><th>Status</th></tr></thead>
+        <tbody><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Members -->
+  <div class="section-title">Members</div>
+  <div class="card">
+    <div class="table-wrap">
+      <table id="members-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Permissions</th></tr></thead>
+        <tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://jhbednwfcgrhusagyuhn.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_b8sY-aUx8FzIGUuxVuOnOQ_EW-C2t1P';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const EQUIPMENT = {
+  e1:'Fast Scanning Cal.', e2:'Diff. Scanning Cal.', e3:'Instron Tensile',
+  e4:'Instron Impact', e5:'Rheometer', e6:'DMA', e7:'Ox-tran',
+  e8:'Vacuum Oven #1', e9:'Vacuum Oven #2', e10:'Vacuum Oven #3',
+  e11:'Sonicator', e12:'Carver Press', e13:'Batch Foaming'
+};
+
+function fmtDuration(mins) {
+  if (!mins && mins !== 0) return '—';
+  if (mins < 60) return mins + ' min';
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h + 'h' + (m ? ' ' + m + 'm' : '');
+}
+
+function fmtDate(str) {
+  if (!str) return '—';
+  return new Date(str).toLocaleString('en-CA', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function badge(status) {
+  const map = { approved:'badge-approved', pending:'badge-pending', rejected:'badge-rejected', active:'badge-active' };
+  return `<span class="badge ${map[status] || ''}">${status}</span>`;
+}
+
+function bars(items, maxVal, colorClass='') {
+  if (!items.length) return '<div class="empty">No data yet</div>';
+  return `<div class="bar-list">${items.map(({label, value, display}) => `
+    <div class="bar-row">
+      <span class="bar-label" title="${label}">${label}</span>
+      <div class="bar-track"><div class="bar-fill ${colorClass}" style="width:${maxVal ? Math.round(value/maxVal*100) : 0}%"></div></div>
+      <span class="bar-val">${display}</span>
+    </div>`).join('')}</div>`;
+}
+
+async function loadAll() {
+  const [
+    { data: sessions },
+    { data: bookings },
+    { data: members },
+    { data: perms }
+  ] = await Promise.all([
+    db.from('sessions').select('*').order('signed_in_at', { ascending: false }),
+    db.from('bookings').select('*').order('created_at', { ascending: false }),
+    db.from('members').select('*').order('name'),
+    db.from('member_permissions').select('*')
+  ]);
+
+  renderKPIs(sessions, bookings, members);
+  renderEquipBars(sessions);
+  renderHeatmap(sessions);
+  renderUserBars(sessions);
+  renderBookingStatusBars(bookings);
+  renderSessionsTable(sessions.slice(0, 20));
+  renderBookingsTable(bookings.slice(0, 20));
+  renderMembersTable(members, perms);
+}
+
+function renderKPIs(sessions, bookings, members) {
+  const totalHours  = Math.round(sessions.reduce((s, x) => s + (x.duration_minutes || 0), 0) / 60);
+  const activeSess  = sessions.filter(s => !s.signed_out_at).length;
+  const approvedB   = bookings.filter(b => b.status === 'approved').length;
+  const pendingM    = members.filter(m => m.status === 'pending').length;
+  const noShowRate  = bookings.length ? Math.round(bookings.filter(b => b.status === 'rejected').length / bookings.length * 100) : 0;
+
+  document.getElementById('kpi-grid').innerHTML = `
+    <div class="kpi"><div class="kpi-value">${sessions.length}</div><div class="kpi-label">Total sign-ins</div><div class="kpi-sub">${activeSess} active now</div></div>
+    <div class="kpi green"><div class="kpi-value">${totalHours}h</div><div class="kpi-label">Total machine time</div><div class="kpi-sub">across all equipment</div></div>
+    <div class="kpi"><div class="kpi-value">${bookings.length}</div><div class="kpi-label">Total bookings</div><div class="kpi-sub">${approvedB} approved</div></div>
+    <div class="kpi ${noShowRate > 20 ? 'red' : 'amber'}"><div class="kpi-value">${noShowRate}%</div><div class="kpi-label">No-show rate</div><div class="kpi-sub">auto-declined</div></div>
+    <div class="kpi"><div class="kpi-value">${members.length}</div><div class="kpi-label">Members</div><div class="kpi-sub">${pendingM} pending approval</div></div>
+  `;
+}
+
+function renderEquipBars(sessions) {
+  // Sessions count
+  const sessCount = {};
+  const hoursCount = {};
+  sessions.forEach(s => {
+    sessCount[s.equip_id]  = (sessCount[s.equip_id]  || 0) + 1;
+    hoursCount[s.equip_id] = (hoursCount[s.equip_id] || 0) + (s.duration_minutes || 0);
+  });
+
+  const sessItems = Object.entries(sessCount).sort((a,b) => b[1]-a[1]).slice(0, 10)
+    .map(([id, v]) => ({ label: EQUIPMENT[id] || id, value: v, display: v + ' sessions' }));
+  const maxS = Math.max(...sessItems.map(x => x.value), 1);
+  document.getElementById('sessions-bars').innerHTML = bars(sessItems, maxS);
+  document.getElementById('sessions-meta').textContent = sessions.length + ' total';
+
+  const hoursItems = Object.entries(hoursCount).sort((a,b) => b[1]-a[1]).slice(0, 10)
+    .map(([id, mins]) => ({ label: EQUIPMENT[id] || id, value: mins, display: fmtDuration(mins) }));
+  const maxH = Math.max(...hoursItems.map(x => x.value), 1);
+  document.getElementById('hours-bars').innerHTML = bars(hoursItems, maxH, 'amber');
+  document.getElementById('hours-meta').textContent = fmtDuration(Object.values(hoursCount).reduce((a,b)=>a+b,0));
+}
+
+function renderHeatmap(sessions) {
+  // Build equip × hour matrix
+  const hours = Array.from({length:12}, (_,i) => i + 7); // 7am–6pm
+  const matrix = {};
+  const equipIds = [...new Set(sessions.map(s => s.equip_id))].slice(0, 10);
+
+  sessions.forEach(s => {
+    const h = new Date(s.signed_in_at).getHours();
+    const key = `${s.equip_id}:${h}`;
+    matrix[key] = (matrix[key] || 0) + 1;
+  });
+
+  const allVals = Object.values(matrix);
+  const maxVal = Math.max(...allVals, 1);
+
+  function heatColor(v) {
+    if (!v) return '#e8e5df';
+    const t = v / maxVal;
+    // cream → accent green
+    const r = Math.round(232 - t * (232 - 45));
+    const g = Math.round(229 - t * (229 - 106));
+    const b = Math.round(223 - t * (223 - 79));
+    return `rgb(${r},${g},${b})`;
+  }
+
+  const el = document.getElementById('heat-grid');
+  if (!sessions.length) { el.innerHTML = '<div class="empty">No sessions yet</div>'; return; }
+
+  el.innerHTML = `
+    <div class="heat-label">Colour intensity = number of sign-ins at that hour</div>
+    ${equipIds.map(id => `
+      <div class="heat-row">
+        <span class="heat-eq-label" title="${EQUIPMENT[id]||id}">${EQUIPMENT[id]||id}</span>
+        ${hours.map(h => {
+          const v = matrix[`${id}:${h}`] || 0;
+          return `<div class="heat-cell" style="background:${heatColor(v)}" title="${EQUIPMENT[id]||id} @ ${h}:00 — ${v} sign-ins"></div>`;
+        }).join('')}
+      </div>`).join('')}
+    <div class="heat-hours">
+      ${hours.map(h => `<span class="heat-hour-label">${h}</span>`).join('')}
+    </div>
+  `;
+}
+
+function renderUserBars(sessions) {
+  const userMin = {};
+  sessions.forEach(s => {
+    if (s.duration_minutes) userMin[s.name] = (userMin[s.name] || 0) + s.duration_minutes;
+  });
+  const items = Object.entries(userMin).sort((a,b)=>b[1]-a[1]).slice(0,10)
+    .map(([name, mins]) => ({ label: name, value: mins, display: fmtDuration(mins) }));
+  const max = Math.max(...items.map(x=>x.value), 1);
+  document.getElementById('users-bars').innerHTML = bars(items, max, 'steel');
+  document.getElementById('users-meta').textContent = Object.keys(userMin).length + ' users';
+}
+
+function renderBookingStatusBars(bookings) {
+  const counts = {};
+  bookings.forEach(b => counts[b.status] = (counts[b.status] || 0) + 1);
+  const order = ['approved','pending','rejected'];
+  const colorMap = { approved:'', pending:'amber', rejected:'red' };
+  const items = order.filter(s => counts[s]).map(s => ({ label: s, value: counts[s], display: counts[s], _color: colorMap[s] }));
+  const max = Math.max(...items.map(x=>x.value), 1);
+  document.getElementById('bookings-status-bars').innerHTML = items.length
+    ? `<div class="bar-list">${items.map(({label, value, display, _color}) => `
+        <div class="bar-row">
+          <span class="bar-label">${label}</span>
+          <div class="bar-track"><div class="bar-fill ${_color}" style="width:${Math.round(value/max*100)}%"></div></div>
+          <span class="bar-val">${display}</span>
+        </div>`).join('')}</div>`
+    : '<div class="empty">No bookings yet</div>';
+}
+
+function renderSessionsTable(sessions) {
+  const tbody = document.querySelector('#sessions-table tbody');
+  if (!sessions.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No sessions yet</td></tr>'; return; }
+  tbody.innerHTML = sessions.map(s => `
+    <tr>
+      <td>${s.name || '—'}</td>
+      <td>${EQUIPMENT[s.equip_id] || s.equip_id}</td>
+      <td>${fmtDate(s.signed_in_at)}</td>
+      <td>${fmtDuration(s.duration_minutes)}</td>
+      <td>${s.signed_out_at ? badge('approved') : badge('active')}</td>
+    </tr>`).join('');
+}
+
+function renderBookingsTable(bookings) {
+  const tbody = document.querySelector('#bookings-table tbody');
+  if (!bookings.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No bookings yet</td></tr>'; return; }
+  tbody.innerHTML = bookings.map(b => `
+    <tr>
+      <td>${b.name || '—'}</td>
+      <td>${EQUIPMENT[b.equip_id] || b.equip_id}</td>
+      <td>${b.date || '—'}</td>
+      <td>${b.start_time ? b.start_time.slice(0,5) : '—'}</td>
+      <td>${fmtDuration(b.duration)}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${b.purpose||''}">${b.purpose || '—'}</td>
+      <td>${badge(b.status)}</td>
+    </tr>`).join('');
+}
+
+function renderMembersTable(members, perms) {
+  const tbody = document.querySelector('#members-table tbody');
+  const permMap = {};
+  (perms || []).forEach(p => {
+    if (!permMap[p.member_id]) permMap[p.member_id] = [];
+    permMap[p.member_id].push(EQUIPMENT[p.equip_id] || p.equip_id);
+  });
+
+  if (!members.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No members yet</td></tr>'; return; }
+  tbody.innerHTML = members.map(m => `
+    <tr>
+      <td>${m.name || '<em style="color:var(--muted)">unnamed</em>'}</td>
+      <td style="font-family:var(--mono);font-size:12px">${m.email || '—'}</td>
+      <td>${badge(m.status)}</td>
+      <td style="font-size:12px;color:var(--muted)">${(permMap[m.id] || []).join(', ') || '—'}</td>
+    </tr>`).join('');
+}
+
+loadAll();
+
+// Auto-refresh every 60 seconds
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>
