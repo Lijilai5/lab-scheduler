@@ -29,7 +29,7 @@ h2 { font-size:22px; font-weight:600; margin-bottom:6px; }
 <body>
 <div class="card">
   <h2>Create account</h2>
-  <p class="subtitle" id="subtitle">Register for lab access. A staff member will approve your account.</p>
+  <p class="subtitle">Register for lab access. A staff member will approve your account.</p>
   <div id="main"></div>
 </div>
 
@@ -40,26 +40,21 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const params = new URLSearchParams(location.search);
 const tokenHash = params.get('token');
-const type = params.get('type');
+const type      = params.get('type');
+const email     = params.get('email') || '';
 
-async function init() {
+// Show the form immediately — do NOT verify the token on page load.
+// Outlook and other email clients pre-fetch links, which would consume
+// the one-time token before the user ever sees the page.
+// Token is only verified when the user actually submits the form.
+
+function init() {
   const el = document.getElementById('main');
 
   if (!tokenHash || type !== 'invite') {
-    document.getElementById('subtitle').textContent = '';
     el.innerHTML = `<div class="error" style="display:block">Invalid or missing invite link. Please ask your admin to resend the invitation.</div>`;
     return;
   }
-
-  // Verify the OTP token to establish a session and get the user's email
-  const { data, error } = await db.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' });
-  if (error) {
-    document.getElementById('subtitle').textContent = '';
-    el.innerHTML = `<div class="error" style="display:block">This invite link has expired or already been used. Please ask your admin to resend the invitation.</div>`;
-    return;
-  }
-
-  const email = data?.user?.email || '';
 
   el.innerHTML = `
     <div class="form-row">
@@ -107,9 +102,18 @@ async function createAccount() {
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Creating account…';
 
+  // Verify the token only now, when the user actually submits
+  const { data: verifyData, error: verifyErr } = await db.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' });
+  if (verifyErr) {
+    err.textContent = 'This invite link has expired or already been used. Please ask your admin to resend the invitation.';
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Create account';
+    return;
+  }
+
   const { data: { user }, error: pwErr } = await db.auth.updateUser({ password: pass });
   if (pwErr) {
-    err.textContent = 'Error: ' + pwErr.message;
+    err.textContent = 'Error setting password: ' + pwErr.message;
     err.style.display = 'block';
     btn.disabled = false; btn.textContent = 'Create account';
     return;
