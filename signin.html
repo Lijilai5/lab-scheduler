@@ -112,6 +112,17 @@ async function autoDeclineNoShowsForMachine() {
 async function init() {
   try { await autoDeclineNoShowsForMachine(); } catch(e) { console.error('Auto-decline check failed:', e); }
 
+  // Check if equipment is disabled
+  const { data: statusData } = await db.from('equipment_status').select('disabled,reason').eq('equip_id', machineId).single().catch(() => ({ data: null }));
+  if (statusData && statusData.disabled) {
+    document.getElementById('main-content').innerHTML = `
+      <div style="background:var(--red-bg);border-radius:var(--radius);padding:16px;text-align:left">
+        <div style="font-weight:500;color:var(--red);margin-bottom:4px">🔧 Out of service</div>
+        <div style="font-size:13px;color:var(--red)">${statusData.reason || 'This machine is currently unavailable. Contact staff for more information.'}</div>
+      </div>`;
+    return;
+  }
+
   const { data } = await db.from('sessions').select('*').eq('equip_id', machineId).is('signed_out_at', null).order('signed_in_at', { ascending: false }).limit(1);
   const active = data && data[0];
 
