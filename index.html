@@ -221,6 +221,23 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
   display: flex; align-items: center; gap: 6px;
 }
 .drag-hint svg { flex-shrink: 0; }
+.equip-status-row { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border:1px solid var(--border2); border-radius:var(--radius); margin-bottom:8px; background:var(--bg2); transition:opacity 0.2s; }
+.equip-status-row.disabled-row { opacity:0.6; background:var(--red-bg); border-color:#f5c6c6; }
+.equip-status-info { flex:1; }
+.equip-status-name { font-size:14px; font-weight:500; }
+.equip-status-cat { font-size:12px; color:var(--muted); margin-top:2px; }
+.equip-status-reason { margin-top:6px; }
+.equip-status-reason input { font-size:12px; padding:5px 9px; border:1px solid var(--border2); border-radius:6px; font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); width:260px; outline:none; }
+.equip-toggle { display:flex; align-items:center; gap:10px; flex-shrink:0; margin-left:16px; }
+.equip-disabled-label { font-size:12px; font-weight:500; color:var(--red); display:none; }
+.disabled-row .equip-disabled-label { display:block; }
+/* toggle switch */
+.toggle-switch { position:relative; width:42px; height:24px; flex-shrink:0; }
+.toggle-switch input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; cursor:pointer; inset:0; background:#ccc; border-radius:24px; transition:background 0.2s; }
+.toggle-slider:before { content:''; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:transform 0.2s; }
+.toggle-switch input:checked + .toggle-slider { background:var(--green); }
+.toggle-switch input:checked + .toggle-slider:before { transform:translateX(18px); }
 </style>
 </head>
 <body>
@@ -264,14 +281,6 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
         <p class="auth-sub">Your email is confirmed ✓<br><br>Your account is waiting for staff approval. You'll be able to book equipment once approved. You can still browse the schedule.</p>
         <button class="btn-pin" onclick="closeAuthOverlay()">Browse schedule</button>
         <div class="auth-alt" style="margin-top:12px"><a onclick="doSignOut()">Sign out</a></div>
-      </div>
-
-      <div id="panel-setup-name">
-        <h2>Welcome! Set your name</h2>
-        <p class="auth-sub">Before you continue, enter your full name so staff can identify you.</p>
-        <div class="form-row"><label>Full name</label><input type="text" id="setup-name-input" placeholder="e.g. Alex Kim" autocomplete="name"></div>
-        <div class="auth-error" id="setup-name-error"></div>
-        <button class="btn-pin" id="setup-name-btn" onclick="saveSetupName()">Continue</button>
       </div>
     </div>
   </div>
@@ -407,6 +416,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <button class="admin-subtab active" id="subtab-bookings"      onclick="showAdminTab('bookings')">Bookings</button>
     <button class="admin-subtab"        id="subtab-registrations" onclick="showAdminTab('registrations')">Registrations <span class="nav-badge" id="reg-count" style="display:none;background:#e05c2a">0</span></button>
     <button class="admin-subtab"        id="subtab-members"       onclick="showAdminTab('members')">Members</button>
+    <button class="admin-subtab"        id="subtab-equipment"     onclick="showAdminTab('equipment')">Equipment</button>
   </div>
   <div id="admin-bookings-panel">
     <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
@@ -431,6 +441,10 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
       </tr></thead>
       <tbody id="members-tbody"><tr><td colspan="5" style="text-align:center;padding:32px;color:var(--hint)">Loading…</td></tr></tbody>
     </table>
+  </div>
+  <div id="admin-equipment-panel" style="display:none">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Toggle equipment off to mark it as out of service. Disabled machines cannot be booked or signed into.</p>
+    <div id="equipment-status-list"></div>
   </div>
 </div>
 
@@ -555,7 +569,49 @@ let modalSlot = null;
 let currentMember = null;
 let editingMemberId = null;
 let calViewYear = new Date().getFullYear(), calViewMonth = new Date().getMonth();
-let adminSubTab = 'bookings';
+let allEquipStatus = {}; // equip_id -> { disabled, reason }
+
+async function fetchEquipStatus() {
+  const { data } = await db.from('equipment_status').select('*');
+  allEquipStatus = {};
+  (data || []).forEach(r => allEquipStatus[r.equip_id] = { disabled: r.disabled, reason: r.reason || '' });
+}
+
+async function toggleEquipDisabled(equipId, disabled) {
+  await db.from('equipment_status').upsert({ equip_id: equipId, disabled, updated_at: new Date().toISOString() }, { onConflict: 'equip_id' });
+  await fetchEquipStatus();
+  renderEquipGrid();
+  populateEquipSelect();
+  renderEquipStatusPanel();
+}
+
+async function saveEquipReason(equipId, reason) {
+  await db.from('equipment_status').upsert({ equip_id: equipId, reason, updated_at: new Date().toISOString() }, { onConflict: 'equip_id' });
+  allEquipStatus[equipId] = { ...allEquipStatus[equipId], reason };
+}
+
+function renderEquipStatusPanel() {
+  const el = document.getElementById('equipment-status-list');
+  if (!el) return;
+  el.innerHTML = EQUIPMENT.map(eq => {
+    const st = allEquipStatus[eq.id] || { disabled: false, reason: '' };
+    return `
+      <div class="equip-status-row${st.disabled ? ' disabled-row' : ''}" id="esr-${eq.id}">
+        <div class="equip-status-info">
+          <div class="equip-status-name">${eq.icon} ${eq.name}</div>
+          <div class="equip-status-cat">${eq.category}</div>
+          ${st.disabled ? `<div class="equip-status-reason"><input type="text" placeholder="Reason (optional)" value="${st.reason}" onchange="saveEquipReason('${eq.id}', this.value)" oninput="saveEquipReason('${eq.id}', this.value)"></div>` : ''}
+        </div>
+        <div class="equip-toggle">
+          <span class="equip-disabled-label">Out of service</span>
+          <label class="toggle-switch" title="${st.disabled ? 'Enable' : 'Disable'} this machine">
+            <input type="checkbox" ${st.disabled ? '' : 'checked'} onchange="toggleEquipDisabled('${eq.id}', !this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>`;
+  }).join('');
+}
 
 // ── FIX: AbortController to cancel stale drag event listeners ─────
 // Each call to initDragSelect (triggered by renderWeekGrid on week
@@ -599,6 +655,7 @@ let _drag = null; // active drag state
     console.error('Boot error:', e);
   }
   try { await fetchSessions(); } catch(e) {}
+  try { await fetchEquipStatus(); } catch(e) {}
   setSyncStatus(true, 'Live');
 
   db.channel('bookings-live')
@@ -646,20 +703,10 @@ async function loadMemberData(member) {
   if (selectedEquip) renderWeekGrid();
 
   if (currentMember.status === 'approved') {
-    if (!currentMember.name) {
-      showAuthOverlay();
-      showAuthPanel('setup-name');
-    } else {
-      closeAuthOverlay();
-      populateEquipSelect();
-    }
+    closeAuthOverlay();
+    populateEquipSelect();
   } else if (currentMember.status === 'pending') {
-    if (!currentMember.name) {
-      showAuthOverlay();
-      showAuthPanel('setup-name');
-    } else {
-      showAuthPanel('pending');
-    }
+    showAuthPanel('pending');
   } else {
     await db.auth.signOut();
   }
@@ -728,29 +775,6 @@ async function doSignIn() {
     btn.disabled = false; btn.textContent = 'Sign in';
     errEl.textContent = 'Network error: ' + e.message;
     errEl.classList.add('show');
-  }
-}
-
-async function saveSetupName() {
-  const name = document.getElementById('setup-name-input').value.trim();
-  const errEl = document.getElementById('setup-name-error');
-  const btn = document.getElementById('setup-name-btn');
-  errEl.classList.remove('show');
-  if (!name) { errEl.textContent = 'Please enter your name.'; errEl.classList.add('show'); return; }
-
-  btn.disabled = true; btn.textContent = 'Saving…';
-  const { error } = await db.from('members').update({ name }).eq('id', currentMember.id);
-  if (error) { errEl.textContent = 'Error saving: ' + error.message; errEl.classList.add('show'); btn.disabled = false; btn.textContent = 'Continue'; return; }
-
-  currentMember.name = name;
-  updateNavMember();
-  btn.disabled = false; btn.textContent = 'Continue';
-
-  if (currentMember.status === 'approved') {
-    closeAuthOverlay();
-    populateEquipSelect();
-  } else {
-    showAuthPanel('pending');
   }
 }
 
@@ -906,11 +930,12 @@ function adminLogout() { adminUnlocked = false; showPage('schedule'); }
 
 function showAdminTab(tab) {
   adminSubTab = tab;
-  ['bookings','registrations','members'].forEach(t => {
+  ['bookings','registrations','members','equipment'].forEach(t => {
     document.getElementById('subtab-' + t).classList.toggle('active', t === tab);
     document.getElementById('admin-' + t + '-panel').style.display = t === tab ? 'block' : 'none';
   });
   if (tab === 'members' || tab === 'registrations') fetchMembers();
+  if (tab === 'equipment') renderEquipStatusPanel();
 }
 
 function setFilter(f, el) {
@@ -1106,20 +1131,24 @@ function renderEquipGrid() {
       .sort((a, c) => new Date(a.date + 'T' + a.start_time) - new Date(c.date + 'T' + c.start_time))[0];
 
     const isApproved = currentMember && currentMember.status === 'approved';
+    const isDisabled = allEquipStatus[eq.id] && allEquipStatus[eq.id].disabled;
+    const disabledReason = isDisabled ? (allEquipStatus[eq.id].reason || 'Out of service') : '';
 
     let dot = 'dot-free', txt = 'Available now';
-    if (isApproved && !currentMember.permissions.has(eq.id)) { dot = 'dot-locked'; txt = 'No access'; }
+    if (isDisabled) { dot = 'dot-busy'; txt = disabledReason; }
+    else if (isApproved && !currentMember.permissions.has(eq.id)) { dot = 'dot-locked'; txt = 'No access'; }
     else if (active) { dot = 'dot-busy'; txt = 'In use'; }
     else if (upcoming && (new Date(upcoming.date + 'T' + upcoming.start_time) - now) / 60000 < 60) { dot = 'dot-soon'; txt = 'Booked soon'; }
 
     const card = document.createElement('div');
-    card.className = 'equip-card' + (selectedEquip === eq.id ? ' selected' : '') + (isApproved && !currentMember.permissions.has(eq.id) ? ' locked' : '');
+    card.className = 'equip-card' + (selectedEquip === eq.id ? ' selected' : '') + (isApproved && !currentMember.permissions.has(eq.id) ? ' locked' : '') + (isDisabled ? ' locked' : '');
     card.innerHTML = `
       <div class="equip-name">${eq.name}</div>
       <div class="equip-cat">${eq.category}</div>
       <div class="equip-status"><span class="status-dot ${dot}"></span>${txt}</div>
-      ${upcoming && (!isApproved || currentMember.permissions.has(eq.id)) ? `<div class="equip-next">Next: ${upcoming.date} ${upcoming.start_time}</div>` : ''}
-      ${isApproved && !currentMember.permissions.has(eq.id) ? `<div class="lock-badge">🔒 Not permitted</div>` : ''}
+      ${upcoming && (!isApproved || currentMember.permissions.has(eq.id)) && !isDisabled ? `<div class="equip-next">Next: ${upcoming.date} ${upcoming.start_time}</div>` : ''}
+      ${isApproved && !currentMember.permissions.has(eq.id) && !isDisabled ? `<div class="lock-badge">🔒 Not permitted</div>` : ''}
+      ${isDisabled ? `<div class="lock-badge">🔧 Out of service</div>` : ''}
     `;
     card.onclick = () => selectEquip(eq.id);
     grid.appendChild(card);
@@ -1625,8 +1654,8 @@ function setDayDuration(prefix, days) {
 
 function populateEquipSelect() {
   const permitted = currentMember && currentMember.status === 'approved'
-    ? EQUIPMENT.filter(e => currentMember.permissions.has(e.id))
-    : EQUIPMENT;
+    ? EQUIPMENT.filter(e => currentMember.permissions.has(e.id) && !(allEquipStatus[e.id] && allEquipStatus[e.id].disabled))
+    : EQUIPMENT.filter(e => !(allEquipStatus[e.id] && allEquipStatus[e.id].disabled));
   document.getElementById('f-equip').innerHTML =
     permitted.length > 0
       ? permitted.map(e => `<option value="${e.id}">${e.name} (${e.category})</option>`).join('')
@@ -1642,6 +1671,7 @@ async function submitBooking() {
   const purpose  = document.getElementById('f-purpose').value.trim();
   if (!equipId || !date || !start || !purpose) { alert('Please fill in all fields.'); return; }
   if (!currentMember.permissions.has(equipId)) { alert('You don\'t have permission to book this equipment.'); return; }
+  if (allEquipStatus[equipId] && allEquipStatus[equipId].disabled) { alert('This equipment is currently out of service and cannot be booked.'); return; }
   if (duration > MAX_BOOKING_MINS) { alert('Maximum booking duration is 3 days (72 hours).'); return; }
 
   const btn = document.getElementById('submit-btn');
