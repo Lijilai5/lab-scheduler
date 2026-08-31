@@ -453,6 +453,8 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <div class="page-header" style="margin:0"><h1>Lab usage</h1><p>Live sign-in/out tracking across all machines.</p></div>
     <button onclick="exportSessionsCSV()" style="font-size:12px;font-weight:500;padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;">Download CSV</button>
   </div>
+  <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Power status <span style="font-weight:400;text-transform:none;letter-spacing:0">(from smart plugs, independent of sign-ins)</span></h3>
+  <div class="request-list" id="power-status" style="margin-bottom:28px"><div class="empty-state">No power data yet.</div></div>
   <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Currently active</h3>
   <div class="request-list" id="active-sessions" style="margin-bottom:28px"><div class="empty-state">No one currently signed in.</div></div>
   <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Recent sessions</h3>
@@ -570,6 +572,50 @@ let currentMember = null;
 let editingMemberId = null;
 let calViewYear = new Date().getFullYear(), calViewMonth = new Date().getMonth();
 let allEquipStatus = {}; // equip_id -> { disabled, reason }
+let allPowerStatus = {}; // equip_id -> { is_on, power_watts, recorded_at }
+
+async function fetchPowerStatus() {
+  const { data, error } = await db.from('current_power_status').select('*');
+  if (error) { console.error('fetchPowerStatus error:', error); return; }
+  allPowerStatus = {};
+  (data || []).forEach(r => allPowerStatus[r.equip_id] = r);
+  renderPowerStatus();
+}
+
+function renderPowerStatus() {
+  const el = document.getElementById('power-status');
+  if (!el) return;
+  const rows = EQUIPMENT
+    .map(eq => ({ eq, p: allPowerStatus[eq.id] }))
+    .filter(r => r.p); // only show machines we've heard from at least once
+
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty-state">No power data yet.</div>';
+    return;
+  }
+
+  // Powered-on machines first, then most-recently-updated
+  rows.sort((a, b) => (b.p.is_on - a.p.is_on) || (new Date(b.p.recorded_at) - new Date(a.p.recorded_at)));
+
+  el.innerHTML = rows.map(({ eq, p }) => `
+    <div class="request-item">
+      <div class="req-top">
+        <div>
+          <div class="req-name">${eq.name}</div>
+          <div class="req-equip">${p.is_on ? 'Powered on' : 'Idle / off'} · ${Number(p.power_watts).toFixed(1)} W · updated ${timeAgo(p.recorded_at)}</div>
+        </div>
+        <span class="status-dot ${p.is_on ? 'dot-busy' : 'dot-free'}"></span>
+      </div>
+    </div>`).join('');
+}
+
+function timeAgo(dateStr) {
+  const diff = Math.floor((Date.now() - new Date(dateStr)) / 60000);
+  if (diff < 1) return 'just now';
+  if (diff < 60) return diff + ' min ago';
+  const h = Math.floor(diff / 60), m = diff % 60;
+  return h + 'h ' + (m > 0 ? m + 'm' : '') + ' ago';
+}
 
 async function fetchEquipStatus() {
   const { data } = await db.from('equipment_status').select('*');
@@ -656,6 +702,7 @@ let _drag = null; // active drag state
   }
   try { await fetchSessions(); } catch(e) {}
   try { await fetchEquipStatus(); } catch(e) {}
+  try { await fetchPowerStatus(); } catch(e) {}
   setSyncStatus(true, 'Live');
 
   db.channel('bookings-live')
@@ -666,6 +713,11 @@ let _drag = null; // active drag state
   db.channel('sessions-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' },
       () => { fetchSessions(); })
+    .subscribe();
+
+  db.channel('power-events-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'power_events' },
+      () => { fetchPowerStatus(); })
     .subscribe();
 
   renderEquipGrid();
@@ -1145,7 +1197,7 @@ function renderEquipGrid() {
     card.innerHTML = `
       <div class="equip-name">${eq.name}</div>
       <div class="equip-cat">${eq.category}</div>
-      <div class="equip-status"><span class="status-dot ${dot}"></span>${txt}</div>
+      <div class="equip-status"><span class="status-dot ${dot}"></span>${txt}${allPowerStatus[eq.id] && allPowerStatus[eq.id].is_on ? ' <span title="Currently drawing power">⚡</span>' : ''}</div>
       ${upcoming && (!isApproved || currentMember.permissions.has(eq.id)) && !isDisabled ? `<div class="equip-next">Next: ${upcoming.date} ${upcoming.start_time}</div>` : ''}
       ${isApproved && !currentMember.permissions.has(eq.id) && !isDisabled ? `<div class="lock-badge">🔒 Not permitted</div>` : ''}
       ${isDisabled ? `<div class="lock-badge">🔧 Out of service</div>` : ''}
