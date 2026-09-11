@@ -51,7 +51,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
 .equip-cat { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
 .equip-status { display: flex; align-items: center; gap: 6px; font-size: 11px; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; }
-.dot-free { background: var(--green); } .dot-busy { background: #e05c2a; } .dot-soon { background: #f0a500; }
+.dot-free { background: var(--green); } .dot-busy { background: #e05c2a; } .dot-soon { background: #f0a500; } .dot-stale { background: #b0b0aa; }
 .dot-locked { background: var(--hint); }
 .equip-next { font-size: 11px; color: var(--muted); margin-top: 6px; }
 .lock-badge { font-size: 10px; color: var(--hint); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
@@ -453,6 +453,8 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <div class="page-header" style="margin:0"><h1>Lab usage</h1><p>Live sign-in/out tracking across all machines.</p></div>
     <button onclick="exportSessionsCSV()" style="font-size:12px;font-weight:500;padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;">Download CSV</button>
   </div>
+  <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">No-show alerts <span style="font-weight:400;text-transform:none;letter-spacing:0">(powered on, nobody signed in within 5 min)</span></h3>
+  <div class="request-list" id="noshow-alerts" style="margin-bottom:28px"><div class="empty-state">No alerts.</div></div>
   <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Power status <span style="font-weight:400;text-transform:none;letter-spacing:0">(from smart plugs, independent of sign-ins)</span></h3>
   <div class="request-list" id="power-status" style="margin-bottom:28px"><div class="empty-state">No power data yet.</div></div>
   <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Currently active</h3>
@@ -575,8 +577,43 @@ let calViewYear = new Date().getFullYear(), calViewMonth = new Date().getMonth()
 let allEquipStatus = {}; // equip_id -> { disabled, reason }
 let allPowerStatus = {}; // equip_id -> { is_on, power_watts, recorded_at }
 
+// A plug should report roughly every POLL_INTERVAL (script default 10s).
+// If we haven't heard from it in a while, treat it as offline rather than
+// trusting the last known on/off state.
+const PLUG_STALE_AFTER_MS = 90 * 1000;
+
+async function fetchNoshowAlerts() {
+  const { data, error } = await db.from('noshow_alerts').select('*').order('checked_at', { ascending: false }).limit(20);
+  if (error) { console.error('fetchNoshowAlerts error:', error); return; }
+  renderNoshowAlerts(data || []);
+}
+
+function renderNoshowAlerts(alerts) {
+  const el = document.getElementById('noshow-alerts');
+  if (!el) return;
+  if (!alerts.length) {
+    el.innerHTML = '<div class="empty-state">No alerts.</div>';
+    return;
+  }
+  el.innerHTML = alerts.map(a => {
+    const name = (EQUIPMENT.find(eq => eq.id === a.equip_id) || {}).name || a.equip_id;
+    const coveredNames = (a.covered_equip_ids || [])
+      .map(id => (EQUIPMENT.find(eq => eq.id === id) || {}).name || id)
+      .join(', ');
+    return `
+    <div class="request-item">
+      <div class="req-top">
+        <div>
+          <div class="req-name">${name}</div>
+          <div class="req-equip">Powered on ${timeAgo(a.power_on_at)}, no sign-in on: ${coveredNames}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 async function fetchPowerStatus() {
-  const { data, error } = await db.from('current_power_status').select('*');
+  const { data, error } = await db.from('plug_status').select('*');
   if (error) { console.error('fetchPowerStatus error:', error); return; }
   allPowerStatus = {};
   (data || []).forEach(r => allPowerStatus[r.equip_id] = r);
@@ -595,19 +632,30 @@ function renderPowerStatus() {
     return;
   }
 
-  // Powered-on machines first, then most-recently-updated
-  rows.sort((a, b) => (b.p.is_on - a.p.is_on) || (new Date(b.p.recorded_at) - new Date(a.p.recorded_at)));
+  const withStale = rows.map(r => ({ ...r, stale: (Date.now() - new Date(r.p.last_seen_at)) > PLUG_STALE_AFTER_MS }));
 
-  el.innerHTML = rows.map(({ eq, p }) => `
+  // Powered-on machines first, then stale/offline ones pushed to the bottom
+  withStale.sort((a, b) => {
+    if (a.stale !== b.stale) return a.stale ? 1 : -1;
+    return (b.p.is_on - a.p.is_on) || (new Date(b.p.last_seen_at) - new Date(a.p.last_seen_at));
+  });
+
+  el.innerHTML = withStale.map(({ eq, p, stale }) => {
+    const label = stale
+      ? `No signal · last seen ${timeAgo(p.last_seen_at)}`
+      : `${p.is_on ? 'Powered on' : 'Idle / off'} · ${Number(p.power_watts).toFixed(1)} W · updated ${timeAgo(p.last_seen_at)}`;
+    const dotClass = stale ? 'dot-stale' : (p.is_on ? 'dot-busy' : 'dot-free');
+    return `
     <div class="request-item">
       <div class="req-top">
         <div>
           <div class="req-name">${eq.name}</div>
-          <div class="req-equip">${p.is_on ? 'Powered on' : 'Idle / off'} · ${Number(p.power_watts).toFixed(1)} W · updated ${timeAgo(p.recorded_at)}</div>
+          <div class="req-equip">${label}</div>
         </div>
-        <span class="status-dot ${p.is_on ? 'dot-busy' : 'dot-free'}"></span>
+        <span class="status-dot ${dotClass}"></span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function timeAgo(dateStr) {
@@ -704,7 +752,12 @@ let _drag = null; // active drag state
   try { await fetchSessions(); } catch(e) {}
   try { await fetchEquipStatus(); } catch(e) {}
   try { await fetchPowerStatus(); } catch(e) {}
+  try { await fetchNoshowAlerts(); } catch(e) {}
   setSyncStatus(true, 'Live');
+
+  // Re-render (not re-fetch) periodically so a plug that's gone silent
+  // flips to "No signal" even if no new row ever arrives.
+  setInterval(renderPowerStatus, 15000);
 
   db.channel('bookings-live')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' },
@@ -716,9 +769,14 @@ let _drag = null; // active drag state
       () => { fetchSessions(); })
     .subscribe();
 
-  db.channel('power-events-live')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'power_events' },
+  db.channel('plug-status-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'plug_status' },
       () => { fetchPowerStatus(); })
+    .subscribe();
+
+  db.channel('noshow-alerts-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'noshow_alerts' },
+      () => { fetchNoshowAlerts(); })
     .subscribe();
 
   renderEquipGrid();
@@ -1198,7 +1256,7 @@ function renderEquipGrid() {
     card.innerHTML = `
       <div class="equip-name">${eq.name}</div>
       <div class="equip-cat">${eq.category}</div>
-      <div class="equip-status"><span class="status-dot ${dot}"></span>${txt}${allPowerStatus[eq.id] && allPowerStatus[eq.id].is_on ? ' <span title="Currently drawing power">⚡</span>' : ''}</div>
+      <div class="equip-status"><span class="status-dot ${dot}"></span>${txt}${allPowerStatus[eq.id] && allPowerStatus[eq.id].is_on && (Date.now() - new Date(allPowerStatus[eq.id].last_seen_at)) <= PLUG_STALE_AFTER_MS ? ' <span title="Currently drawing power">⚡</span>' : ''}</div>
       ${upcoming && (!isApproved || currentMember.permissions.has(eq.id)) && !isDisabled ? `<div class="equip-next">Next: ${upcoming.date} ${upcoming.start_time}</div>` : ''}
       ${isApproved && !currentMember.permissions.has(eq.id) && !isDisabled ? `<div class="lock-badge">🔒 Not permitted</div>` : ''}
       ${isDisabled ? `<div class="lock-badge">🔧 Out of service</div>` : ''}
