@@ -417,6 +417,7 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <button class="admin-subtab"        id="subtab-registrations" onclick="showAdminTab('registrations')">Registrations <span class="nav-badge" id="reg-count" style="display:none;background:#e05c2a">0</span></button>
     <button class="admin-subtab"        id="subtab-members"       onclick="showAdminTab('members')">Members</button>
     <button class="admin-subtab"        id="subtab-equipment"     onclick="showAdminTab('equipment')">Equipment</button>
+    <button class="admin-subtab"        id="subtab-alerts"        onclick="showAdminTab('alerts')">Alerts <span class="nav-badge" id="noshow-count" style="display:none;background:#e05c2a">0</span></button>
   </div>
   <div id="admin-bookings-panel">
     <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
@@ -446,6 +447,10 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Toggle equipment off to mark it as out of service. Disabled machines cannot be booked or signed into.</p>
     <div id="equipment-status-list"></div>
   </div>
+  <div id="admin-alerts-panel" style="display:none">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Powered on for 5+ minutes with nobody signed in to it (or, for shared-circuit equipment, none of the machines it covers).</p>
+    <div class="request-list" id="noshow-alerts"><div class="empty-state">No alerts.</div></div>
+  </div>
 </div>
 
 <div class="page" id="page-usage">
@@ -453,15 +458,26 @@ nav { background: var(--text); color: #f7f6f2; padding: 0 32px; display: flex; a
     <div class="page-header" style="margin:0"><h1>Lab usage</h1><p>Live sign-in/out tracking across all machines.</p></div>
     <button onclick="exportSessionsCSV()" style="font-size:12px;font-weight:500;padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;">Download CSV</button>
   </div>
-  <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">No-show alerts <span style="font-weight:400;text-transform:none;letter-spacing:0">(powered on, nobody signed in within 5 min)</span></h3>
-  <div class="request-list" id="noshow-alerts" style="margin-bottom:28px"><div class="empty-state">No alerts.</div></div>
-  <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Power status <span style="font-weight:400;text-transform:none;letter-spacing:0">(from smart plugs, independent of sign-ins)</span></h3>
-  <div class="request-list" id="power-status" style="margin-bottom:28px"><div class="empty-state">No power data yet.</div></div>
-  <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Currently active</h3>
-  <div class="request-list" id="active-sessions" style="margin-bottom:28px"><div class="empty-state">No one currently signed in.</div></div>
-  <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Recent sessions</h3>
-  <div class="request-list" id="past-sessions"><div class="empty-state">No sessions yet.</div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start">
+    <div>
+      <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Live users</h3>
+      <h4 style="font-size:12px;font-weight:500;color:var(--muted);margin-bottom:8px">Currently active</h4>
+      <div class="request-list" id="active-sessions" style="margin-bottom:24px"><div class="empty-state">No one currently signed in.</div></div>
+      <h4 style="font-size:12px;font-weight:500;color:var(--muted);margin-bottom:8px">Recent sessions</h4>
+      <div class="request-list" id="past-sessions"><div class="empty-state">No sessions yet.</div></div>
+    </div>
+    <div>
+      <h3 style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px">Instrument live tracking <span style="font-weight:400;text-transform:none;letter-spacing:0">(from smart plugs)</span></h3>
+      <div class="request-list" id="power-status"><div class="empty-state">No power data yet.</div></div>
+    </div>
+  </div>
 </div>
+
+<style>
+@media (max-width: 860px) {
+  #page-usage > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+}
+</style>
 
 <div class="modal-overlay" id="slot-modal">
   <div class="modal">
@@ -590,6 +606,11 @@ async function fetchNoshowAlerts() {
 
 function renderNoshowAlerts(alerts) {
   const el = document.getElementById('noshow-alerts');
+  const badge = document.getElementById('noshow-count');
+  if (badge) {
+    if (alerts.length > 0) { badge.style.display = 'inline-block'; badge.textContent = alerts.length; }
+    else { badge.style.display = 'none'; }
+  }
   if (!el) return;
   if (!alerts.length) {
     el.innerHTML = '<div class="empty-state">No alerts.</div>';
@@ -1041,12 +1062,13 @@ function adminLogout() { adminUnlocked = false; showPage('schedule'); }
 
 function showAdminTab(tab) {
   adminSubTab = tab;
-  ['bookings','registrations','members','equipment'].forEach(t => {
+  ['bookings','registrations','members','equipment','alerts'].forEach(t => {
     document.getElementById('subtab-' + t).classList.toggle('active', t === tab);
     document.getElementById('admin-' + t + '-panel').style.display = t === tab ? 'block' : 'none';
   });
   if (tab === 'members' || tab === 'registrations') fetchMembers();
   if (tab === 'equipment') renderEquipStatusPanel();
+  if (tab === 'alerts') fetchNoshowAlerts();
 }
 
 function setFilter(f, el) {
